@@ -499,15 +499,18 @@ export class CesiumCommandExecutor {
 
   private executeTerrainExaggeration(command: Extract<CesiumCommand, { type: 'terrain.exaggeration' }>): { success: boolean; message: string } {
     // Use scene.verticalExaggeration for Cesium 1.99+ or globe.terrainExaggeration for older versions
-    if ('verticalExaggeration' in this.viewer.scene) {
-      this.viewer.scene.verticalExaggeration = command.factor;
+    const scene = this.viewer.scene as CesiumScene & { verticalExaggeration?: number; verticalExaggerationRelativeHeight?: number };
+    const globe = this.viewer.scene.globe as CesiumGlobe | undefined;
+
+    if (scene.verticalExaggeration !== undefined) {
+      scene.verticalExaggeration = command.factor;
       if (command.relativeHeight !== undefined) {
-        this.viewer.scene.verticalExaggerationRelativeHeight = command.relativeHeight;
+        scene.verticalExaggerationRelativeHeight = command.relativeHeight;
       }
-    } else if (this.viewer.scene.globe && 'terrainExaggeration' in this.viewer.scene.globe) {
-      this.viewer.scene.globe.terrainExaggeration = command.factor;
+    } else if (globe && 'terrainExaggeration' in globe) {
+      globe.terrainExaggeration = command.factor;
       if (command.relativeHeight !== undefined) {
-        this.viewer.scene.globe.terrainExaggerationRelativeHeight = command.relativeHeight;
+        globe.terrainExaggerationRelativeHeight = command.relativeHeight;
       }
     } else {
       return { success: false, message: 'Terrain exaggeration not supported in this Cesium version' };
@@ -622,6 +625,257 @@ export class CesiumCommandExecutor {
     }
   }
 
+  private executeCameraOrbit(command: Extract<CesiumCommand, { type: 'camera.orbit' }>): { success: boolean; message: string } {
+    // Stop any existing orbit animation
+    if (this.activeOrbitAnimation) {
+      this.activeOrbitAnimation.stop();
+      this.activeOrbitAnimation = null;
+    }
+
+    const target = Cesium.Cartesian3.fromDegrees(
+      command.target.longitude,
+      command.target.latitude,
+      command.target.height || 0
+    );
+
+    // Default to full 360-degree orbit if not specified
+    const headingDelta = command.headingDelta ?? Cesium.Math.TWO_PI;
+    const pitchDelta = command.pitchDelta ?? 0;
+    const duration = command.duration * 1000; // Convert to milliseconds
+
+    // Capture starting orientation
+    const startHeading = this.viewer.camera.heading;
+    const startPitch = this.viewer.camera.pitch;
+
+    // Calculate range from current camera position to target
+    const cameraPosition = this.viewer.camera.position;
+    const cartographic = Cesium.Cartographic.fromCartesian(cameraPosition);
+    const targetCartographic = Cesium.Cartographic.fromCartesian(target);
+
+    // Approximate range calculation using haversine-like distance
+    const dLat = targetCartographic.latitude - cartographic.latitude;
+    const dLon = targetCartographic.longitude - cartographic.longitude;
+    const dHeight = (command.target.height || 0) - cartographic.height;
+    const range = Math.sqrt(dLat * dLat + dLon * dLon) * 6371000 + Math.abs(dHeight); // Rough estimate
+
+    const startTime = Date.now();
+    let animationFrameId: number;
+    let stopped = false;
+
+    const animate = () => {
+      if (stopped) return;
+
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+
+      // Interpolate heading and pitch
+      const currentHeading = startHeading + headingDelta * t;
+      const currentPitch = startPitch + pitchDelta * t;
+
+      const offset = new Cesium.HeadingPitchRange(
+        currentHeading,
+        currentPitch,
+        range > 0 ? range : 1000000 // Default range if calculation failed
+      );
+
+      this.viewer.camera.lookAt(target, offset);
+
+      if (t < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        // Reset camera transform when orbit completes
+        this.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        this.activeOrbitAnimation = null;
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    this.activeOrbitAnimation = {
+      stop: () => {
+        stopped = true;
+        cancelAnimationFrame(animationFrameId);
+        this.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      },
+    };
+
+    return {
+      success: true,
+      message: `Orbiting around ${command.target.latitude}, ${command.target.longitude} for ${command.duration} seconds`,
+    };
+  }
+
+  private executeCameraTrack(command: Extract<CesiumCommand, { type: 'camera.track' }>): { success: boolean; message: string } {
+    // Stop any existing tracking
+    if (this.activeTrackingSubscription) {
+      this.activeTrackingSubscription();
+      this.activeTrackingSubscription = null;
+    }
+
+    // Find the entity to track
+    let entity = this.viewer.entities.getById(command.entityId);
+
+    // If not in entities collection, check data sources
+    if (!entity) {
+      for (let i = 0; i < this.viewer.dataSources.length; i++) {
+        const dataSource = this.viewer.dataSources.get(i) as { entities?: CesiumEntityCollection };
+        if (dataSource.entities) {
+          entity = dataSource.entities.getById(command.entityId);
+          if (entity) break;
+        }
+      }
+    }
+
+    if (!entity) {
+      return { success: false, message: `Entity '${command.entityId}' not found` };
+    }
+
+    const trackedEntity = entity as { position?: { getValue: (time: unknown) => unknown } };
+
+    // Default offset values
+    const offset = command.offset || {
+      heading: 0,
+      pitch: Cesium.Math.toRadians(-45),
+      range: 10000,
+    };
+
+    const headingPitchRange = new Cesium.HeadingPitchRange(
+      offset.heading,
+      offset.pitch,
+      offset.range
+    );
+
+    // Subscribe to clock tick to update camera position
+    const onTick = () => {
+      if (!trackedEntity.position) return;
+
+      const position = trackedEntity.position.getValue(this.viewer.clock.currentTime);
+      if (Cesium.defined(position)) {
+        this.viewer.camera.lookAt(position, headingPitchRange);
+      }
+    };
+
+    // Add the listener and store the removal function
+    const removeListener = this.viewer.clock.onTick.addEventListener(onTick);
+
+    this.activeTrackingSubscription = () => {
+      removeListener();
+      this.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    };
+
+    return {
+      success: true,
+      message: `Tracking entity '${command.entityId}'`,
+    };
+  }
+
+  private executeCameraCinematicFlight(command: Extract<CesiumCommand, { type: 'camera.cinematicFlight' }>): { success: boolean; message: string } {
+    // Stop any existing cinematic flight
+    if (this.activeCinematicFlight) {
+      this.activeCinematicFlight.stop();
+      this.activeCinematicFlight = null;
+    }
+
+    if (command.waypoints.length < 2) {
+      return { success: false, message: 'Cinematic flight requires at least 2 waypoints' };
+    }
+
+    const waypoints = command.waypoints;
+    let currentWaypointIndex = 0;
+    let stopped = false;
+
+    const flyToNextWaypoint = () => {
+      if (stopped) return;
+
+      if (currentWaypointIndex >= waypoints.length) {
+        if (command.loop) {
+          currentWaypointIndex = 0;
+        } else {
+          this.activeCinematicFlight = null;
+          return;
+        }
+      }
+
+      const waypoint = waypoints[currentWaypointIndex];
+      if (!waypoint) {
+        return;
+      }
+      const destination = Cesium.Cartesian3.fromDegrees(
+        waypoint.position.longitude,
+        waypoint.position.latitude,
+        waypoint.position.height || 1000
+      );
+
+      const duration = waypoint.duration ?? 5; // Default 5 seconds per waypoint
+
+      const orientation = waypoint.orientation
+        ? {
+            heading: waypoint.orientation.heading ?? 0,
+            pitch: waypoint.orientation.pitch ?? Cesium.Math.toRadians(-15),
+            roll: waypoint.orientation.roll ?? 0,
+          }
+        : {
+            heading: 0,
+            pitch: Cesium.Math.toRadians(-15),
+            roll: 0,
+          };
+
+      this.viewer.camera.flyTo({
+        destination,
+        orientation,
+        duration,
+        complete: () => {
+          currentWaypointIndex++;
+          flyToNextWaypoint();
+        },
+        cancel: () => {
+          // Flight was cancelled (user interaction or programmatic stop)
+        },
+      });
+    };
+
+    flyToNextWaypoint();
+
+    this.activeCinematicFlight = {
+      stop: () => {
+        stopped = true;
+        // The camera.flyTo will be cancelled when we call any other camera movement
+      },
+    };
+
+    return {
+      success: true,
+      message: `Starting cinematic flight through ${waypoints.length} waypoints${command.loop ? ' (looping)' : ''}`,
+    };
+  }
+
+  stopTracking(): { success: boolean; message: string } {
+    if (this.activeTrackingSubscription) {
+      this.activeTrackingSubscription();
+      this.activeTrackingSubscription = null;
+      return { success: true, message: 'Stopped tracking entity' };
+    }
+    return { success: false, message: 'No active tracking to stop' };
+  }
+
+  stopCinematicFlight(): { success: boolean; message: string } {
+    if (this.activeCinematicFlight) {
+      this.activeCinematicFlight.stop();
+      this.activeCinematicFlight = null;
+      return { success: true, message: 'Stopped cinematic flight' };
+    }
+    return { success: false, message: 'No active cinematic flight to stop' };
+  }
+
+  stopOrbit(): { success: boolean; message: string } {
+    if (this.activeOrbitAnimation) {
+      this.activeOrbitAnimation.stop();
+      this.activeOrbitAnimation = null;
+      return { success: true, message: 'Stopped orbit animation' };
+    }
+    return { success: false, message: 'No active orbit animation to stop' };
+  }
+
   async loadCZML(czml: CZMLDocumentArray, id?: string): Promise<{ success: boolean; message: string; data?: unknown }> {
     try {
       const dataSource = await Cesium.CzmlDataSource.load(czml);
@@ -648,7 +902,7 @@ export class CesiumCommandExecutor {
     this.loadedDataSources.clear();
 
     // Also clear all loaded tilesets
-    for (const [id, tileset] of this.loadedTilesets) {
+    for (const [_id, tileset] of this.loadedTilesets) {
       this.viewer.scene.primitives.remove(tileset);
       if (!tileset.isDestroyed()) {
         tileset.destroy();

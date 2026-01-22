@@ -186,6 +186,101 @@ const tools = {
       pointSize: z.number().positive().optional().describe('Tracing point size in pixels'),
     }),
   },
+  load3DTiles: {
+    name: 'load3DTiles',
+    description: 'Load a Cesium 3D Tileset from a URL or Cesium Ion asset ID',
+    inputSchema: z.object({
+      id: z.string().describe('Unique identifier for this tileset (used for removal and styling)'),
+      url: z.string().describe('URL to the tileset.json file'),
+      assetId: z.number().optional().describe('Cesium Ion asset ID (alternative to URL)'),
+      maximumScreenSpaceError: z.number().positive().optional().describe('Maximum screen space error for level of detail (default: 16)'),
+      maximumMemoryUsage: z.number().positive().optional().describe('Maximum GPU memory usage in MB (default: 512)'),
+      show: z.boolean().optional().describe('Whether to show the tileset initially (default: true)'),
+    }),
+  },
+  remove3DTiles: {
+    name: 'remove3DTiles',
+    description: 'Remove a loaded 3D Tileset by its ID',
+    inputSchema: z.object({
+      id: z.string().describe('ID of the tileset to remove'),
+    }),
+  },
+  style3DTiles: {
+    name: 'style3DTiles',
+    description: 'Apply a style to a 3D Tileset (color, visibility, point size)',
+    inputSchema: z.object({
+      id: z.string().describe('ID of the tileset to style'),
+      color: z.union([
+        z.string(),
+        z.object({
+          conditions: z.array(z.tuple([z.string(), z.string()])).describe('Array of [condition, color] pairs'),
+        }),
+      ]).optional().describe('Color expression (e.g., "color(\'red\')" or conditional object)'),
+      show: z.union([z.string(), z.boolean()]).optional().describe('Show expression (e.g., "${height} > 100" or true/false)'),
+      pointSize: z.union([z.string(), z.number()]).optional().describe('Point size expression or number'),
+    }),
+  },
+  setTerrainExaggeration: {
+    name: 'setTerrainExaggeration',
+    description: 'Adjust the vertical exaggeration of terrain',
+    inputSchema: z.object({
+      factor: z.number().positive().describe('Vertical exaggeration factor (1.0 = normal, 2.0 = double height)'),
+      relativeHeight: z.number().optional().describe('Height in meters at which exaggeration starts to apply (default: 0)'),
+    }),
+  },
+  orbitTarget: {
+    name: 'orbitTarget',
+    description: 'Orbit the camera around a geographic target point. The camera will smoothly rotate around the target over the specified duration.',
+    inputSchema: z.object({
+      longitude: z.number().min(-180).max(180).describe('Target longitude in degrees'),
+      latitude: z.number().min(-90).max(90).describe('Target latitude in degrees'),
+      height: z.number().optional().describe('Target height in meters (default: 0)'),
+      duration: z.number().positive().describe('Duration of the orbit animation in seconds'),
+      headingDelta: z.number().optional().describe('How much to rotate in radians (default: 2*PI for full 360-degree orbit)'),
+      pitchDelta: z.number().optional().describe('Change in pitch during orbit in radians (default: 0)'),
+    }),
+  },
+  trackEntity: {
+    name: 'trackEntity',
+    description: 'Have the camera follow/track a specific entity as it moves. The camera will continuously update to keep the entity in view.',
+    inputSchema: z.object({
+      entityId: z.string().describe('ID of the entity to track'),
+      heading: z.number().optional().describe('Camera heading offset in radians (default: 0)'),
+      pitch: z.number().optional().describe('Camera pitch offset in radians (default: -PI/4, looking down at 45 degrees)'),
+      range: z.number().positive().optional().describe('Distance from the entity in meters (default: 10000)'),
+    }),
+  },
+  cinematicFlight: {
+    name: 'cinematicFlight',
+    description: 'Create a smooth cinematic flight through multiple waypoints. The camera will fly to each waypoint in sequence.',
+    inputSchema: z.object({
+      waypoints: z.array(z.object({
+        longitude: z.number().min(-180).max(180).describe('Waypoint longitude'),
+        latitude: z.number().min(-90).max(90).describe('Waypoint latitude'),
+        height: z.number().optional().describe('Waypoint height in meters'),
+        duration: z.number().positive().optional().describe('Duration to reach this waypoint in seconds (default: 5)'),
+        heading: z.number().optional().describe('Camera heading at this waypoint in radians'),
+        pitch: z.number().optional().describe('Camera pitch at this waypoint in radians'),
+        roll: z.number().optional().describe('Camera roll at this waypoint in radians'),
+      })).min(2).describe('Array of waypoints to fly through (minimum 2)'),
+      loop: z.boolean().optional().describe('Whether to loop back to the first waypoint after completing the flight (default: false)'),
+    }),
+  },
+  stopTracking: {
+    name: 'stopTracking',
+    description: 'Stop tracking an entity and return camera control to the user',
+    inputSchema: z.object({}),
+  },
+  stopCinematicFlight: {
+    name: 'stopCinematicFlight',
+    description: 'Stop an active cinematic flight animation',
+    inputSchema: z.object({}),
+  },
+  stopOrbit: {
+    name: 'stopOrbit',
+    description: 'Stop an active orbit animation',
+    inputSchema: z.object({}),
+  },
 };
 
 type ToolName = keyof typeof tools;
@@ -570,6 +665,120 @@ export class CesiumMCPServer {
           message: `Animated path created with ${animatedPathPackets.length} segments`,
           data: { czml, entityIds },
         };
+      }
+
+      case 'load3DTiles': {
+        const args = input as ToolInput<'load3DTiles'>;
+        const command: CesiumCommand = {
+          type: 'tiles3d.add',
+          id: args.id,
+          url: args.url,
+          assetId: args.assetId,
+          maximumScreenSpaceError: args.maximumScreenSpaceError,
+          maximumMemoryUsage: args.maximumMemoryUsage,
+          show: args.show,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'remove3DTiles': {
+        const args = input as ToolInput<'remove3DTiles'>;
+        const command: CesiumCommand = {
+          type: 'tiles3d.remove',
+          id: args.id,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'style3DTiles': {
+        const args = input as ToolInput<'style3DTiles'>;
+        const command: CesiumCommand = {
+          type: 'tiles3d.style',
+          id: args.id,
+          style: {
+            color: args.color,
+            show: args.show,
+            pointSize: args.pointSize,
+          },
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'setTerrainExaggeration': {
+        const args = input as ToolInput<'setTerrainExaggeration'>;
+        const command: CesiumCommand = {
+          type: 'terrain.exaggeration',
+          factor: args.factor,
+          relativeHeight: args.relativeHeight,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'orbitTarget': {
+        const args = input as ToolInput<'orbitTarget'>;
+        const command: CesiumCommand = {
+          type: 'camera.orbit',
+          target: {
+            longitude: args.longitude,
+            latitude: args.latitude,
+            height: args.height,
+          },
+          duration: args.duration,
+          headingDelta: args.headingDelta,
+          pitchDelta: args.pitchDelta,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'trackEntity': {
+        const args = input as ToolInput<'trackEntity'>;
+        const command: CesiumCommand = {
+          type: 'camera.track',
+          entityId: args.entityId,
+          offset: (args.heading !== undefined || args.pitch !== undefined || args.range !== undefined) ? {
+            heading: args.heading ?? 0,
+            pitch: args.pitch ?? -Math.PI / 4,
+            range: args.range ?? 10000,
+          } : undefined,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'cinematicFlight': {
+        const args = input as ToolInput<'cinematicFlight'>;
+        const command: CesiumCommand = {
+          type: 'camera.cinematicFlight',
+          waypoints: args.waypoints.map(wp => ({
+            position: {
+              longitude: wp.longitude,
+              latitude: wp.latitude,
+              height: wp.height,
+            },
+            duration: wp.duration,
+            orientation: (wp.heading !== undefined || wp.pitch !== undefined || wp.roll !== undefined) ? {
+              heading: wp.heading,
+              pitch: wp.pitch,
+              roll: wp.roll,
+            } : undefined,
+          })),
+          loop: args.loop,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'stopTracking': {
+        // This requires direct access to the executor - return a special action
+        return { success: true, message: 'Stop tracking requested', data: { action: 'stopTracking' } };
+      }
+
+      case 'stopCinematicFlight': {
+        // This requires direct access to the executor - return a special action
+        return { success: true, message: 'Stop cinematic flight requested', data: { action: 'stopCinematicFlight' } };
+      }
+
+      case 'stopOrbit': {
+        // This requires direct access to the executor - return a special action
+        return { success: true, message: 'Stop orbit requested', data: { action: 'stopOrbit' } };
       }
 
       default:

@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  cesium-slm:
+    build:
+      context: .
+      args:
+        VITE_CESIUM_TOKEN: ${VITE_CESIUM_TOKEN}
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Add a reverse proxy for HTTPS (uncomment to use)
+  # nginx-proxy:
+  #   image: jwilder/nginx-proxy
+  #   ports:
+  #     - "443:443"
+  #   volumes:
+  #     - /var/run/docker.sock:/tmp/docker.sock:ro
+  #     - ./certs:/etc/nginx/certs
+  #   depends_on:
+  #     - cesium-slm

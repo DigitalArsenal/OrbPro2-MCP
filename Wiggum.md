@@ -324,24 +324,30 @@ Phase 2 (After Phase 1):
 
 ## COMPLETION PROMISE
 
-Output "Cesium SLM Finished" ONLY when ALL of the following are true:
+Output the following ONLY when ALL criteria below are met:
 
-1. ✅ npm run build succeeds with no errors
-2. ✅ npm run test passes with 80%+ coverage
+<promise>Cesium SLM Finished</promise>
+
+**Criteria (ALL must be true):**
+
+1. ✅ `npm run build` succeeds with no errors
+2. ✅ `npm run test` passes with 80%+ coverage
 3. ✅ 10,000+ training examples generated
 4. ✅ Fine-tuning pipeline functional
 5. ✅ WASM MCP module compiles
 6. ✅ Voice input working
 7. ✅ Autocomplete working
 8. ✅ CZML examples load in Cesium
-9. ✅ npm run dev serves working app
+9. ✅ `npm run dev` serves working app
 10. ✅ Natural language commands execute correctly
+
+**CRITICAL:** Do NOT output the promise until genuinely complete. The loop is designed to continue until all criteria are met.
 
 ---
 
 ## PROGRESS TRACKING
 
-Each agent should update `.claude/Progress.md` upon completing tasks:
+Each agent should update `Progress.md` (in main folder) upon completing tasks:
 
 ```markdown
 ## Agent [N]: [Name]

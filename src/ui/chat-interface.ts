@@ -116,7 +116,7 @@ export class CommandHistory {
     }
     // If at oldest, stay there (wrap behavior: keep at oldest)
 
-    return this.history[this.currentIndex];
+    return this.history[this.currentIndex] ?? null;
   }
 
   navigateDown(): string | null {
@@ -125,7 +125,7 @@ export class CommandHistory {
     if (this.currentIndex < this.history.length - 1) {
       // Go to newer command
       this.currentIndex++;
-      return this.history[this.currentIndex];
+      return this.history[this.currentIndex] ?? null;
     } else {
       // At newest, return to temp input
       this.currentIndex = -1;
@@ -344,6 +344,8 @@ export class ChatInterface {
 
     for (let i = 0; i < this.suggestions.length; i++) {
       const suggestion = this.suggestions[i];
+      if (!suggestion) continue;
+
       const item = document.createElement('div');
       item.className = 'chat-autocomplete-item';
       item.dataset.index = i.toString();
@@ -385,7 +387,10 @@ export class ChatInterface {
 
     // Add new highlight
     if (index >= 0 && index < items.length) {
-      items[index].classList.add('chat-autocomplete-item-selected');
+      const item = items[index];
+      if (item) {
+        item.classList.add('chat-autocomplete-item-selected');
+      }
       this.selectedSuggestionIndex = index;
     }
   }
@@ -394,6 +399,8 @@ export class ChatInterface {
     if (index < 0 || index >= this.suggestions.length) return;
 
     const suggestion = this.suggestions[index];
+    if (!suggestion) return;
+
     this.input.value = suggestion.text;
     this.input.focus();
 

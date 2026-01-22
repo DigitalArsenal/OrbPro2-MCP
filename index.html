@@ -171,20 +171,613 @@
       text-decoration: underline;
     }
 
-    /* Responsive adjustments */
-    @media (max-width: 900px) {
+    /* ============================================
+       RESPONSIVE LAYOUT - Mobile First Approach
+       ============================================ */
+
+    /* Sidebar toggle button (hamburger menu) */
+    .sidebar-toggle {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      right: 16px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      border: none;
+      cursor: pointer;
+      z-index: 1001;
+      box-shadow: 0 4px 16px rgba(129, 140, 248, 0.4);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sidebar-toggle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(129, 140, 248, 0.5);
+    }
+
+    .sidebar-toggle:active {
+      transform: scale(0.95);
+    }
+
+    .sidebar-toggle svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+
+    .sidebar-toggle .icon-close {
+      display: none;
+    }
+
+    .sidebar-toggle.active .icon-hamburger {
+      display: none;
+    }
+
+    .sidebar-toggle.active .icon-close {
+      display: block;
+    }
+
+    /* Sidebar overlay for mobile */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 26, 0.8);
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.active {
+      opacity: 1;
+    }
+
+    /* Mobile chat input fixed at bottom */
+    .mobile-chat-input {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 16px;
+      background: #12122a;
+      border-top: 1px solid #2d2d4a;
+      z-index: 998;
+    }
+
+    .mobile-chat-input input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid #3d3d5c;
+      background: #1a1a2e;
+      color: white;
+      font-size: 16px;
+      min-height: 48px;
+    }
+
+    .mobile-chat-input input:focus {
+      outline: none;
+      border-color: #818cf8;
+    }
+
+    /* Gesture hints overlay */
+    .gesture-hints {
+      display: none;
+      position: fixed;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(26, 26, 46, 0.95);
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: 1px solid #3d3d5c;
+      z-index: 100;
+      text-align: center;
+      max-width: 280px;
+      animation: fadeInUp 0.5s ease;
+    }
+
+    .gesture-hints.visible {
+      display: block;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    .gesture-hint-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      color: #e0e0e0;
+      font-size: 14px;
+    }
+
+    .gesture-hint-item:not(:last-child) {
+      border-bottom: 1px solid #2d2d4a;
+    }
+
+    .gesture-hint-icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2d2d4a;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .gesture-hint-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: #818cf8;
+    }
+
+    .gesture-hints-dismiss {
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid #3d3d5c;
+      color: #9ca3af;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+
+    .gesture-hints-dismiss:hover {
+      background: #2d2d4a;
+      color: white;
+    }
+
+    /* Model selector modal for mobile */
+    .model-selector-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 26, 0.95);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .model-selector-modal.active {
+      display: flex;
+    }
+
+    .model-selector-modal-content {
+      background: #1a1a2e;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid #3d3d5c;
+    }
+
+    .model-selector-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #2d2d4a;
+    }
+
+    .model-selector-modal-header h3 {
+      font-size: 1.1em;
+      color: white;
+    }
+
+    .model-selector-modal-close {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: background 0.2s ease;
+    }
+
+    .model-selector-modal-close:hover {
+      background: #2d2d4a;
+    }
+
+    .model-selector-modal-close svg {
+      width: 20px;
+      height: 20px;
+      fill: #9ca3af;
+    }
+
+    .model-selector-modal-body {
+      padding: 16px 20px;
+    }
+
+    /* Collapsible status bar */
+    .status-bar-toggle {
+      display: none;
+      width: 100%;
+      padding: 12px 16px;
+      background: #1a1a2e;
+      border: none;
+      border-bottom: 1px solid #2d2d4a;
+      color: white;
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      min-height: 48px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-bar-toggle svg {
+      width: 16px;
+      height: 16px;
+      fill: #9ca3af;
+      transition: transform 0.3s ease;
+    }
+
+    .status-bar-toggle.expanded svg {
+      transform: rotate(180deg);
+    }
+
+    /* ============================================
+       TABLET BREAKPOINT (640px - 1024px)
+       Split view with collapsible sidebar
+       ============================================ */
+    @media (min-width: 640px) and (max-width: 1024px) {
       .app-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 60vh 1fr;
+        grid-template-columns: 1fr 320px;
+        grid-template-rows: auto 1fr;
+      }
+
+      .header h1 {
+        font-size: 1.2em;
+      }
+
+      .header-subtitle {
+        display: none;
       }
 
       .sidebar {
-        border-left: none;
-        border-top: 1px solid #2d2d4a;
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 320px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        padding-top: 60px;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+
+      #cesium-container {
+        grid-column: 1;
+      }
+
+      .sidebar-toggle {
+        display: flex;
+      }
+
+      .sidebar-overlay {
+        display: block;
+        pointer-events: none;
+      }
+
+      .sidebar-overlay.active {
+        pointer-events: auto;
+      }
+
+      .mobile-chat-input {
+        display: block;
+      }
+
+      .gesture-hints {
+        display: none;
+      }
+
+      .gesture-hints.visible {
+        display: block;
+      }
+
+      /* Touch-friendly controls */
+      button,
+      input[type="submit"],
+      .clickable {
+        min-height: 44px;
+        min-width: 44px;
+      }
+
+      #status-container {
+        padding: 16px;
       }
 
       #model-selector-container {
-        max-height: 30vh;
+        padding: 16px;
+      }
+
+      /* Collapsible status bar on tablet */
+      .status-bar-toggle {
+        display: flex;
+      }
+
+      #status-container.collapsed {
+        display: none;
+      }
+    }
+
+    /* ============================================
+       MOBILE BREAKPOINT (< 640px)
+       Full width stacked layout
+       ============================================ */
+    @media (max-width: 639px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile browsers */
+      }
+
+      .header {
+        padding: 10px 16px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+
+      .header h1 {
+        font-size: 1.1em;
+      }
+
+      .header-subtitle {
+        display: none;
+      }
+
+      #cesium-container {
+        height: calc(100vh - 130px);
+        height: calc(100dvh - 130px);
+      }
+
+      /* Sidebar becomes full-screen overlay on mobile */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        border-left: none;
+        padding-top: 0;
+        padding-bottom: 70px;
+      }
+
+      .sidebar.open {
+        transform: translateY(0);
+      }
+
+      .sidebar-toggle {
+        display: flex;
+        bottom: 80px;
+        right: 16px;
+      }
+
+      .sidebar-overlay {
+        display: block;
+        pointer-events: none;
+      }
+
+      .sidebar-overlay.active {
+        pointer-events: auto;
+      }
+
+      .mobile-chat-input {
+        display: block;
+        padding: 12px 16px 24px 16px; /* Extra bottom padding for safe area */
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+
+      .mobile-chat-input input {
+        font-size: 16px; /* Prevent iOS zoom on focus */
+      }
+
+      .gesture-hints.visible {
+        display: block;
+        bottom: 160px;
+      }
+
+      /* Touch-friendly controls - larger touch targets */
+      button,
+      input[type="submit"],
+      .clickable,
+      a {
+        min-height: 44px;
+        min-width: 44px;
+      }
+
+      /* Full-width buttons on mobile */
+      .sidebar button:not(.model-selector-modal-close):not(.status-bar-toggle):not(.gesture-hints-dismiss) {
+        width: 100%;
+        padding: 14px 20px;
+        margin-bottom: 8px;
+      }
+
+      #status-container {
+        padding: 16px;
+      }
+
+      #model-selector-container {
+        padding: 16px;
+        max-height: none;
+        overflow-y: visible;
+      }
+
+      /* Model selector becomes modal trigger on mobile */
+      .model-selector-trigger {
+        display: flex;
+        width: 100%;
+        padding: 14px 16px;
+        background: #1a1a2e;
+        border: 1px solid #3d3d5c;
+        border-radius: 12px;
+        color: white;
+        cursor: pointer;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 48px;
+      }
+
+      .model-selector-trigger svg {
+        width: 16px;
+        height: 16px;
+        fill: #9ca3af;
+      }
+
+      /* Collapsible status bar on mobile */
+      .status-bar-toggle {
+        display: flex;
+      }
+
+      #status-container.collapsed {
+        display: none;
+      }
+
+      #chat-container {
+        flex: 1;
+        padding-bottom: 20px;
+      }
+
+      /* Error container mobile adjustments */
+      #error-container {
+        max-width: calc(100% - 32px);
+        padding: 24px;
+      }
+
+      /* WebGPU warning mobile adjustments */
+      .webgpu-warning-content {
+        padding: 24px;
+        margin: 16px;
+        max-width: calc(100% - 32px);
+      }
+
+      .webgpu-warning h2 {
+        font-size: 1.3em;
+      }
+
+      .webgpu-warning p {
+        font-size: 14px;
+      }
+    }
+
+    /* ============================================
+       DESKTOP BREAKPOINT (> 1024px)
+       Full layout as designed
+       ============================================ */
+    @media (min-width: 1025px) {
+      .app-container {
+        grid-template-columns: 1fr 400px;
+        grid-template-rows: auto 1fr;
+      }
+
+      .sidebar-toggle {
+        display: none;
+      }
+
+      .mobile-chat-input {
+        display: none;
+      }
+
+      .gesture-hints {
+        display: none !important;
+      }
+    }
+
+    /* ============================================
+       LANDSCAPE MODE ADJUSTMENTS
+       ============================================ */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .header {
+        padding: 8px 16px;
+      }
+
+      .header h1 {
+        font-size: 1em;
+      }
+
+      #cesium-container {
+        height: calc(100vh - 100px);
+      }
+
+      .gesture-hints {
+        bottom: 100px;
+        padding: 12px 16px;
+      }
+
+      .gesture-hint-item {
+        padding: 4px 0;
+        font-size: 12px;
+      }
+
+      .mobile-chat-input {
+        padding: 8px 16px;
+      }
+
+      .mobile-chat-input input {
+        padding: 10px 14px;
+        min-height: 40px;
+      }
+    }
+
+    /* ============================================
+       ACCESSIBILITY & REDUCED MOTION
+       ============================================ */
+    @media (prefers-reduced-motion: reduce) {
+      .sidebar,
+      .sidebar-toggle,
+      .sidebar-overlay,
+      .gesture-hints,
+      .status-bar-toggle svg {
+        transition: none;
+      }
+
+      @keyframes fadeInUp {
+        from, to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
       }
     }
 
@@ -219,6 +812,71 @@
     </div>
   </div>
 
+  <!-- Sidebar overlay for mobile/tablet -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Sidebar toggle button (hamburger menu) -->
+  <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+    <svg class="icon-hamburger" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+    </svg>
+    <svg class="icon-close" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    </svg>
+  </button>
+
+  <!-- Mobile chat input (fixed at bottom) -->
+  <div class="mobile-chat-input" id="mobile-chat-input">
+    <input type="text" id="mobile-chat-text" placeholder="Ask about locations..." aria-label="Chat input">
+  </div>
+
+  <!-- Gesture hints for touch navigation -->
+  <div class="gesture-hints" id="gesture-hints">
+    <div class="gesture-hint-item">
+      <div class="gesture-hint-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/>
+        </svg>
+      </div>
+      <span>Drag to rotate globe</span>
+    </div>
+    <div class="gesture-hint-item">
+      <div class="gesture-hint-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM7 9h5v1H7z"/>
+          <path d="M12 9.5c0-.28-.22-.5-.5-.5H10V7.5c0-.28-.22-.5-.5-.5s-.5.22-.5.5V9H7.5c-.28 0-.5.22-.5.5s.22.5.5.5H9v1.5c0 .28.22.5.5.5s.5-.22.5-.5V10h1.5c.28 0 .5-.22.5-.5z"/>
+        </svg>
+      </div>
+      <span>Pinch to zoom</span>
+    </div>
+    <div class="gesture-hint-item">
+      <div class="gesture-hint-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 11.24V7.5C9 6.12 10.12 5 11.5 5S14 6.12 14 7.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74l-3.43-.72c-.08-.01-.15-.03-.24-.03-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z"/>
+        </svg>
+      </div>
+      <span>Double-tap to zoom in</span>
+    </div>
+    <button class="gesture-hints-dismiss" id="gesture-hints-dismiss">Got it</button>
+  </div>
+
+  <!-- Model selector modal for mobile -->
+  <div class="model-selector-modal" id="model-selector-modal">
+    <div class="model-selector-modal-content">
+      <div class="model-selector-modal-header">
+        <h3>Select Model</h3>
+        <button class="model-selector-modal-close" id="model-selector-modal-close" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="model-selector-modal-body" id="model-selector-modal-body">
+        <!-- Model options will be cloned here on mobile -->
+      </div>
+    </div>
+  </div>
+
   <div class="app-container">
     <header class="header">
       <div>
@@ -229,7 +887,14 @@
 
     <div id="cesium-container"></div>
 
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
+      <!-- Collapsible status bar toggle -->
+      <button class="status-bar-toggle" id="status-bar-toggle">
+        <span>Status</span>
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+        </svg>
+      </button>
       <div id="status-container"></div>
       <div id="model-selector-container"></div>
       <div id="chat-container"></div>
@@ -245,6 +910,151 @@
     if (!navigator.gpu) {
       document.getElementById('webgpu-warning').style.display = 'flex';
     }
+
+    // Responsive UI JavaScript
+    (function() {
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+      const mobileChatInput = document.getElementById('mobile-chat-input');
+      const mobileChatText = document.getElementById('mobile-chat-text');
+      const gestureHints = document.getElementById('gesture-hints');
+      const gestureHintsDismiss = document.getElementById('gesture-hints-dismiss');
+      const statusBarToggle = document.getElementById('status-bar-toggle');
+      const statusContainer = document.getElementById('status-container');
+      const modelSelectorModal = document.getElementById('model-selector-modal');
+      const modelSelectorModalClose = document.getElementById('model-selector-modal-close');
+
+      // Check if mobile/tablet
+      function isMobileOrTablet() {
+        return window.innerWidth <= 1024;
+      }
+
+      // Toggle sidebar
+      function toggleSidebar() {
+        const isOpen = sidebar.classList.toggle('open');
+        sidebarToggle.classList.toggle('active', isOpen);
+        sidebarOverlay.classList.toggle('active', isOpen);
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+      }
+
+      // Close sidebar
+      function closeSidebar() {
+        sidebar.classList.remove('open');
+        sidebarToggle.classList.remove('active');
+        sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      // Toggle status bar
+      function toggleStatusBar() {
+        const isExpanded = statusBarToggle.classList.toggle('expanded');
+        if (isExpanded) {
+          statusContainer.classList.remove('collapsed');
+        } else {
+          statusContainer.classList.add('collapsed');
+        }
+      }
+
+      // Show gesture hints on first touch device visit
+      function showGestureHints() {
+        if (isMobileOrTablet() && 'ontouchstart' in window) {
+          const hintsShown = localStorage.getItem('cesium-slm-gesture-hints-shown');
+          if (!hintsShown) {
+            setTimeout(function() {
+              gestureHints.classList.add('visible');
+            }, 2000);
+          }
+        }
+      }
+
+      // Dismiss gesture hints
+      function dismissGestureHints() {
+        gestureHints.classList.remove('visible');
+        localStorage.setItem('cesium-slm-gesture-hints-shown', 'true');
+      }
+
+      // Open model selector modal
+      function openModelSelectorModal() {
+        modelSelectorModal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      // Close model selector modal
+      function closeModelSelectorModal() {
+        modelSelectorModal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      // Event listeners
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', toggleSidebar);
+      }
+
+      if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeSidebar);
+      }
+
+      if (gestureHintsDismiss) {
+        gestureHintsDismiss.addEventListener('click', dismissGestureHints);
+      }
+
+      if (statusBarToggle) {
+        statusBarToggle.addEventListener('click', toggleStatusBar);
+      }
+
+      if (modelSelectorModalClose) {
+        modelSelectorModalClose.addEventListener('click', closeModelSelectorModal);
+      }
+
+      // Close sidebar on escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeSidebar();
+          closeModelSelectorModal();
+        }
+      });
+
+      // Handle mobile chat input
+      if (mobileChatText) {
+        mobileChatText.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter' && mobileChatText.value.trim()) {
+            // Dispatch custom event for main app to handle
+            const event = new CustomEvent('mobile-chat-submit', {
+              detail: { message: mobileChatText.value.trim() }
+            });
+            document.dispatchEvent(event);
+            mobileChatText.value = '';
+          }
+        });
+      }
+
+      // Handle resize
+      let resizeTimeout;
+      window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+          if (!isMobileOrTablet()) {
+            closeSidebar();
+            closeModelSelectorModal();
+          }
+        }, 100);
+      });
+
+      // Initialize
+      showGestureHints();
+
+      // Expose functions for external use
+      window.cesiumSLMUI = {
+        toggleSidebar: toggleSidebar,
+        closeSidebar: closeSidebar,
+        openModelSelectorModal: openModelSelectorModal,
+        closeModelSelectorModal: closeModelSelectorModal,
+        showGestureHints: function() {
+          gestureHints.classList.add('visible');
+        }
+      };
+    })();
   </script>
 </body>
 </html>
