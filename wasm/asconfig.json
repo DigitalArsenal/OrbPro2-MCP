@@ -1,0 +1,22 @@
+{
+  "targets": {
+    "debug": {
+      "outFile": "build/mcp.debug.wasm",
+      "textFile": "build/mcp.debug.wat",
+      "sourceMap": true,
+      "debug": true
+    },
+    "release": {
+      "outFile": "build/mcp.wasm",
+      "textFile": "build/mcp.wat",
+      "optimizeLevel": 3,
+      "shrinkLevel": 0,
+      "converge": false,
+      "noAssert": false
+    }
+  },
+  "options": {
+    "exportRuntime": true,
+    "runtime": "incremental"
+  }
+}

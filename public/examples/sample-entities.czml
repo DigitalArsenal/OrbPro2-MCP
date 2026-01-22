@@ -1,0 +1,134 @@
+[
+  {
+    "id": "document",
+    "name": "Sample Cesium SLM Entities",
+    "version": "1.0",
+    "clock": {
+      "interval": "2024-01-01T00:00:00Z/2024-12-31T23:59:59Z",
+      "currentTime": "2024-01-01T12:00:00Z",
+      "multiplier": 1,
+      "range": "LOOP_STOP",
+      "step": "SYSTEM_CLOCK_MULTIPLIER"
+    }
+  },
+  {
+    "id": "point_paris",
+    "name": "Paris",
+    "description": "City of Light",
+    "position": {
+      "cartographicDegrees": [2.3522, 48.8566, 0]
+    },
+    "point": {
+      "color": { "rgba": [255, 0, 0, 255] },
+      "pixelSize": 12,
+      "outlineColor": { "rgba": [255, 255, 255, 255] },
+      "outlineWidth": 2,
+      "show": true,
+      "heightReference": "CLAMP_TO_GROUND"
+    },
+    "label": {
+      "text": "Paris",
+      "font": "14pt sans-serif",
+      "fillColor": { "rgba": [255, 255, 255, 255] },
+      "style": "FILL_AND_OUTLINE",
+      "outlineColor": { "rgba": [0, 0, 0, 200] },
+      "outlineWidth": 2,
+      "horizontalOrigin": "CENTER",
+      "verticalOrigin": "BOTTOM",
+      "pixelOffset": { "cartesian2": [0, -16] }
+    }
+  },
+  {
+    "id": "point_london",
+    "name": "London",
+    "description": "British Capital",
+    "position": {
+      "cartographicDegrees": [-0.1276, 51.5074, 0]
+    },
+    "point": {
+      "color": { "rgba": [0, 0, 255, 255] },
+      "pixelSize": 12,
+      "outlineColor": { "rgba": [255, 255, 255, 255] },
+      "outlineWidth": 2,
+      "show": true,
+      "heightReference": "CLAMP_TO_GROUND"
+    },
+    "label": {
+      "text": "London",
+      "font": "14pt sans-serif",
+      "fillColor": { "rgba": [255, 255, 255, 255] },
+      "style": "FILL_AND_OUTLINE",
+      "outlineColor": { "rgba": [0, 0, 0, 200] },
+      "outlineWidth": 2,
+      "horizontalOrigin": "CENTER",
+      "verticalOrigin": "BOTTOM",
+      "pixelOffset": { "cartesian2": [0, -16] }
+    }
+  },
+  {
+    "id": "line_london_paris",
+    "name": "London to Paris Route",
+    "polyline": {
+      "positions": {
+        "cartographicDegrees": [
+          -0.1276, 51.5074, 0,
+          2.3522, 48.8566, 0
+        ]
+      },
+      "width": 3,
+      "material": {
+        "polylineGlow": {
+          "color": { "rgba": [0, 255, 255, 200] },
+          "glowPower": 0.2
+        }
+      },
+      "clampToGround": true,
+      "show": true
+    }
+  },
+  {
+    "id": "circle_tokyo",
+    "name": "Tokyo Metropolitan Area",
+    "position": {
+      "cartographicDegrees": [139.6917, 35.6895, 0]
+    },
+    "ellipse": {
+      "semiMajorAxis": 50000,
+      "semiMinorAxis": 50000,
+      "height": 0,
+      "material": {
+        "solidColor": {
+          "color": { "rgba": [255, 165, 0, 100] }
+        }
+      },
+      "outline": true,
+      "outlineColor": { "rgba": [255, 165, 0, 255] },
+      "outlineWidth": 2,
+      "show": true
+    }
+  },
+  {
+    "id": "polygon_central_park",
+    "name": "Central Park",
+    "description": "New York City's Urban Oasis",
+    "polygon": {
+      "positions": {
+        "cartographicDegrees": [
+          -73.9730, 40.7644, 0,
+          -73.9580, 40.8005, 0,
+          -73.9493, 40.7968, 0,
+          -73.9642, 40.7608, 0
+        ]
+      },
+      "height": 0,
+      "material": {
+        "solidColor": {
+          "color": { "rgba": [0, 255, 0, 100] }
+        }
+      },
+      "outline": true,
+      "outlineColor": { "rgba": [0, 100, 0, 255] },
+      "show": true
+    }
+  }
+]

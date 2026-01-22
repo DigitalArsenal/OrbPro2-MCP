@@ -1,0 +1,36 @@
+{
+  "model_config": {
+    "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
+    "output_model": "cesium-slm-0.5b",
+    "quantization": "q4f16_1",
+    "max_seq_length": 512
+  },
+  "training_config": {
+    "learning_rate": 2e-5,
+    "num_epochs": 3,
+    "batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "lr_scheduler_type": "cosine"
+  },
+  "lora_config": {
+    "r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "bias": "none",
+    "task_type": "CAUSAL_LM"
+  },
+  "data_config": {
+    "train_file": "cesium-commands-dataset.jsonl",
+    "validation_split": 0.1,
+    "instruction_template": "### Instruction:\n{instruction}\n\n### Response:\n",
+    "response_template": "{output}"
+  },
+  "mlc_conversion": {
+    "target": "webgpu",
+    "quantization": "q4f16_1",
+    "model_lib": "Qwen2.5-0.5B-Instruct-cesium-q4f16_1-webgpu.wasm"
+  }
+}

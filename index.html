@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium SLM - Natural Language Globe Control</title>
+
+  <!-- CesiumJS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a1a;
+      color: white;
+      overflow: hidden;
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      gap: 0;
+    }
+
+    .header {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16162a 100%);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2d2d4a;
+    }
+
+    .header h1 {
+      font-size: 1.4em;
+      font-weight: 600;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-subtitle {
+      font-size: 0.85em;
+      color: #9ca3af;
+      margin-left: 12px;
+    }
+
+    #cesium-container {
+      position: relative;
+    }
+
+    .cesium-viewer {
+      width: 100%;
+      height: 100%;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      background: #12122a;
+      border-left: 1px solid #2d2d4a;
+    }
+
+    #status-container {
+      padding: 12px;
+      border-bottom: 1px solid #2d2d4a;
+    }
+
+    #model-selector-container {
+      padding: 12px;
+      overflow-y: auto;
+      max-height: 50vh;
+    }
+
+    #chat-container {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #error-container {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #1a1a2e;
+      padding: 32px;
+      border-radius: 12px;
+      max-width: 500px;
+      text-align: center;
+      z-index: 1000;
+      border: 1px solid #f87171;
+    }
+
+    .error-message h2 {
+      color: #f87171;
+      margin-bottom: 16px;
+    }
+
+    .error-message p {
+      color: #e0e0e0;
+      margin-bottom: 12px;
+    }
+
+    .error-message ul {
+      text-align: left;
+      color: #9ca3af;
+      padding-left: 24px;
+    }
+
+    .error-message li {
+      margin-bottom: 8px;
+    }
+
+    /* WebGPU not supported overlay */
+    .webgpu-warning {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 26, 0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .webgpu-warning-content {
+      background: #1a1a2e;
+      padding: 40px;
+      border-radius: 16px;
+      max-width: 600px;
+      text-align: center;
+      border: 1px solid #4a4a6a;
+    }
+
+    .webgpu-warning h2 {
+      color: #fbbf24;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+    }
+
+    .webgpu-warning p {
+      color: #e0e0e0;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .webgpu-warning a {
+      color: #818cf8;
+      text-decoration: none;
+    }
+
+    .webgpu-warning a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 60vh 1fr;
+      }
+
+      .sidebar {
+        border-left: none;
+        border-top: 1px solid #2d2d4a;
+      }
+
+      #model-selector-container {
+        max-height: 30vh;
+      }
+    }
+
+    /* Cesium credit fix */
+    .cesium-credit-logoContainer {
+      display: block !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- WebGPU Warning (shown by JS if not supported) -->
+  <div class="webgpu-warning" id="webgpu-warning">
+    <div class="webgpu-warning-content">
+      <h2>WebGPU Required</h2>
+      <p>
+        This application uses WebGPU to run AI models directly in your browser.
+        Unfortunately, your browser doesn't support WebGPU yet.
+      </p>
+      <p>
+        Please use one of the following browsers:
+      </p>
+      <ul style="text-align: left; margin: 16px 0; color: #9ca3af;">
+        <li><strong>Google Chrome</strong> version 113 or later</li>
+        <li><strong>Microsoft Edge</strong> version 113 or later</li>
+        <li><strong>Chrome Canary</strong> with WebGPU flags enabled</li>
+      </ul>
+      <p>
+        <a href="https://developer.chrome.com/docs/web-platform/webgpu/" target="_blank">
+          Learn more about WebGPU support
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <header class="header">
+      <div>
+        <h1>Cesium SLM</h1>
+        <span class="header-subtitle">Natural Language Globe Control with WebGPU</span>
+      </div>
+    </header>
+
+    <div id="cesium-container"></div>
+
+    <div class="sidebar">
+      <div id="status-container"></div>
+      <div id="model-selector-container"></div>
+      <div id="chat-container"></div>
+    </div>
+  </div>
+
+  <div id="error-container"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+
+  <script>
+    // Early WebGPU check
+    if (!navigator.gpu) {
+      document.getElementById('webgpu-warning').style.display = 'flex';
+    }
+  </script>
+</body>
+</html>
