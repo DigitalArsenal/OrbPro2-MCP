@@ -1,0 +1,37 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv \
+    git git-lfs cmake ninja-build \
+    curl wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Emscripten
+RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk && \
+    cd /opt/emsdk && \
+    ./emsdk install latest && \
+    ./emsdk activate latest
+
+# Install MLC-LLM via direct wheel URLs (Linux x86_64)
+RUN pip3 install --upgrade pip && \
+    pip3 install \
+    "https://github.com/mlc-ai/package/releases/download/v0.9.dev0/mlc_ai_nightly_cpu-0.20.dev679-py3-none-manylinux_2_28_x86_64.whl" \
+    "https://github.com/mlc-ai/package/releases/download/v0.9.dev0/mlc_llm_nightly_cpu-0.20.dev108-py3-none-manylinux_2_28_x86_64.whl"
+
+# Install other dependencies
+RUN pip3 install transformers safetensors sentencepiece
+
+# Set up environment
+ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
+ENV EMSDK="/opt/emsdk"
+
+WORKDIR /workspace
+
+# Entry point script
+COPY compile-functiongemma-docker.sh /usr/local/bin/compile-model.sh
+RUN chmod +x /usr/local/bin/compile-model.sh
+
+ENTRYPOINT ["/usr/local/bin/compile-model.sh"]

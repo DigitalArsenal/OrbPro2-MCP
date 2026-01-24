@@ -348,6 +348,55 @@ export const FEW_SHOT_EXAMPLES = [
   },
   {
     category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a sphere to Washington DC',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -77.0369, "latitude": 38.9072, "radius": 1000, "name": "DC Sphere", "color": "red"}}',
+    explanation: 'Sphere at known city with default radius',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Create a 100km radius sphere at New York',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -74.006, "latitude": 40.7128, "radius": 100000, "name": "NY Sphere", "color": "red"}}',
+    explanation: 'Large sphere with 100km radius (100000 meters)',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a sphere to tokyo 100km in radius and 10 km above the ground',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 139.6917, "latitude": 35.6895, "radius": 100000, "height": 10000, "name": "Tokyo Sphere", "color": "red"}}',
+    explanation: 'Sphere with specified radius and height above ground',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Put a ball over Paris',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 2.3522, "latitude": 48.8566, "radius": 1000, "name": "Paris Ball", "color": "red"}}',
+    explanation: 'Ball is a synonym for sphere',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a large green sphere above London',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -0.1276, "latitude": 51.5074, "radius": 5000, "name": "London Sphere", "color": "green"}}',
+    explanation: 'Large sphere at city location',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Create a 3D sphere at coordinates 40.7, -74.0',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -74.0, "latitude": 40.7, "radius": 1000, "name": "Sphere", "color": "red"}}',
+    explanation: 'Sphere at explicit coordinates',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'I want a sphere',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 0, "latitude": 0, "radius": 10000, "name": "Sphere", "color": "red"}}',
+    explanation: 'Sphere request without location defaults to origin',
+  },
+  {
+    category: 'entity',
     tool: 'addEllipsoid',
     userInput: 'Create an ellipsoid at the Statue of Liberty with radii 100x200x150',
     response: '{"tool": "addEllipsoid", "arguments": {"longitude": -74.0445, "latitude": 40.6892, "radiiX": 100, "radiiY": 200, "radiiZ": 150, "name": "Ellipsoid", "color": "green"}}',
@@ -1326,6 +1375,387 @@ export const FEW_SHOT_EXAMPLES = [
     response: '{"tool": "flyTo", "arguments": {"longitude": 139.6917, "latitude": 35.6895, "height": 500000, "duration": 3}}\n{"tool": "addLabel", "arguments": {"longitude": 139.6917, "latitude": 35.6895, "text": "Tokyo", "color": "white"}}\n{"tool": "setSceneMode", "arguments": {"mode": "2D"}}',
     explanation: 'Chain of three operations',
   },
+
+  // ============ ADDITIONAL CAMERA EXAMPLES ============
+  {
+    category: 'camera',
+    tool: 'setView',
+    userInput: 'Teleport to New York',
+    response: '{"tool": "setView", "arguments": {"longitude": -74.006, "latitude": 40.7128, "height": 500000}}',
+    explanation: 'Instant camera move without animation',
+  },
+  {
+    category: 'camera',
+    tool: 'setView',
+    userInput: 'Set camera to Sydney instantly facing south',
+    response: '{"tool": "setView", "arguments": {"longitude": 151.2093, "latitude": -33.8688, "height": 100000, "heading": 180}}',
+    explanation: 'setView with heading (180 = south)',
+  },
+  {
+    category: 'camera',
+    tool: 'setView',
+    userInput: 'Jump to Berlin looking down',
+    response: '{"tool": "setView", "arguments": {"longitude": 13.4050, "latitude": 52.5200, "height": 50000, "pitch": -90}}',
+    explanation: 'setView with pitch looking straight down',
+  },
+  {
+    category: 'camera',
+    tool: 'rotateCamera',
+    userInput: 'Turn left 45 degrees',
+    response: '{"tool": "rotateCamera", "arguments": {"heading": -45}}',
+    explanation: 'Rotate camera left (negative heading)',
+  },
+  {
+    category: 'camera',
+    tool: 'rotateCamera',
+    userInput: 'Look down more',
+    response: '{"tool": "rotateCamera", "arguments": {"pitch": -20}}',
+    explanation: 'Tilt camera downward (negative pitch)',
+  },
+  {
+    category: 'camera',
+    tool: 'rotateCamera',
+    userInput: 'Pan the camera 180 degrees',
+    response: '{"tool": "rotateCamera", "arguments": {"heading": 180}}',
+    explanation: 'Full 180 degree camera rotation',
+  },
+  {
+    category: 'camera',
+    tool: 'trackEntity',
+    userInput: 'Follow the satellite',
+    response: '{"tool": "trackEntity", "arguments": {"entityId": "satellite"}}',
+    explanation: 'Track a named entity',
+  },
+  {
+    category: 'camera',
+    tool: 'trackEntity',
+    userInput: 'Lock camera to the ship',
+    response: '{"tool": "trackEntity", "arguments": {"entityId": "ship"}}',
+    explanation: 'Follow entity with camera',
+  },
+  {
+    category: 'camera',
+    tool: 'trackEntity',
+    userInput: 'Track the car marker',
+    response: '{"tool": "trackEntity", "arguments": {"entityId": "car marker"}}',
+    explanation: 'Keep camera focused on moving entity',
+  },
+  {
+    category: 'camera',
+    tool: 'stopTracking',
+    userInput: 'Stop tracking',
+    response: '{"tool": "stopTracking", "arguments": {}}',
+    explanation: 'Disable entity tracking',
+  },
+  {
+    category: 'camera',
+    tool: 'stopTracking',
+    userInput: 'Unfollow the entity',
+    response: '{"tool": "stopTracking", "arguments": {}}',
+    explanation: 'Stop camera tracking',
+  },
+  {
+    category: 'camera',
+    tool: 'orbitTarget',
+    userInput: 'Circle around New York for 60 seconds',
+    response: '{"tool": "orbitTarget", "arguments": {"longitude": -74.006, "latitude": 40.7128, "duration": 60}}',
+    explanation: 'Orbit animation around city',
+  },
+  {
+    category: 'camera',
+    tool: 'orbitTarget',
+    userInput: 'Rotate around the Statue of Liberty',
+    response: '{"tool": "orbitTarget", "arguments": {"longitude": -74.0445, "latitude": 40.6892, "duration": 30}}',
+    explanation: 'Orbit around landmark',
+  },
+  {
+    category: 'camera',
+    tool: 'orbitTarget',
+    userInput: 'Orbit Tokyo Tower for 20 seconds at 5000m',
+    response: '{"tool": "orbitTarget", "arguments": {"longitude": 139.7454, "latitude": 35.6586, "duration": 20, "radius": 5000}}',
+    explanation: 'Orbit with custom radius',
+  },
+  {
+    category: 'camera',
+    tool: 'stopOrbit',
+    userInput: 'Stop orbiting',
+    response: '{"tool": "stopOrbit", "arguments": {}}',
+    explanation: 'Stop orbit animation',
+  },
+
+  // ============ ADDITIONAL SPHERE EXAMPLES ============
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a blue ball at Sydney',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 151.2093, "latitude": -33.8688, "radius": 1000, "name": "Sydney Ball", "color": "blue"}}',
+    explanation: 'Ball synonym for sphere',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Put a sphere over the Kremlin',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 37.6176, "latitude": 55.7520, "radius": 500, "name": "Kremlin Sphere", "color": "red"}}',
+    explanation: 'Sphere at landmark',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Create a yellow sphere in Dubai',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 55.2708, "latitude": 25.2048, "radius": 2000, "name": "Dubai Sphere", "color": "yellow"}}',
+    explanation: 'Sphere with color at city',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a tiny sphere at the Pyramids',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 31.1342, "latitude": 29.9792, "radius": 100, "name": "Pyramids Sphere", "color": "gold"}}',
+    explanation: 'Small radius sphere',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Make a giant sphere covering Europe',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 10, "latitude": 50, "radius": 1000000, "name": "Europe Sphere", "color": "blue"}}',
+    explanation: 'Very large sphere',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add spheres at Berlin and Rome',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 13.4050, "latitude": 52.5200, "radius": 1000, "name": "Berlin Sphere", "color": "red"}}\n{"tool": "addSphere", "arguments": {"longitude": 12.4964, "latitude": 41.9028, "radius": 1000, "name": "Rome Sphere", "color": "green"}}',
+    explanation: 'Multiple spheres at different locations',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Put a transparent green sphere at Chicago',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -87.6298, "latitude": 41.8781, "radius": 5000, "name": "Chicago Sphere", "color": "green"}}',
+    explanation: 'Sphere with descriptive color',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Sphere at coordinates 45, 90',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 90, "latitude": 45, "radius": 1000, "name": "Sphere", "color": "red"}}',
+    explanation: 'Sphere at explicit lat/lon',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Add a 3D orb to San Francisco',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -122.4194, "latitude": 37.7749, "radius": 2000, "name": "SF Orb", "color": "cyan"}}',
+    explanation: 'Orb synonym for sphere',
+  },
+  {
+    category: 'entity',
+    tool: 'addSphere',
+    userInput: 'Place a floating ball 5km high at Denver',
+    response: '{"tool": "addSphere", "arguments": {"longitude": -104.9903, "latitude": 39.7392, "radius": 1000, "height": 5000, "name": "Denver Ball", "color": "purple"}}',
+    explanation: 'Sphere with height offset',
+  },
+
+  // ============ SCENE SETTINGS EXAMPLES ============
+  {
+    category: 'scene',
+    tool: 'setFog',
+    userInput: 'Add light fog',
+    response: '{"tool": "setFog", "arguments": {"enabled": true, "density": 0.0002}}',
+    explanation: 'Light fog with low density',
+  },
+  {
+    category: 'scene',
+    tool: 'setFog',
+    userInput: 'Turn off the fog',
+    response: '{"tool": "setFog", "arguments": {"enabled": false}}',
+    explanation: 'Disable fog',
+  },
+  {
+    category: 'scene',
+    tool: 'setShadows',
+    userInput: 'Enable shadows with soft edges',
+    response: '{"tool": "setShadows", "arguments": {"enabled": true, "softShadows": true}}',
+    explanation: 'Soft shadow rendering',
+  },
+  {
+    category: 'scene',
+    tool: 'setShadows',
+    userInput: 'Turn shadows off',
+    response: '{"tool": "setShadows", "arguments": {"enabled": false}}',
+    explanation: 'Disable shadows',
+  },
+  {
+    category: 'scene',
+    tool: 'setLighting',
+    userInput: 'Turn on day/night cycle',
+    response: '{"tool": "setLighting", "arguments": {"enableLighting": true}}',
+    explanation: 'Enable sun-based lighting',
+  },
+  {
+    category: 'scene',
+    tool: 'setLighting',
+    userInput: 'Disable globe lighting',
+    response: '{"tool": "setLighting", "arguments": {"enableLighting": false}}',
+    explanation: 'Turn off sun lighting',
+  },
+  {
+    category: 'scene',
+    tool: 'setAtmosphere',
+    userInput: 'Enable atmosphere effect',
+    response: '{"tool": "setAtmosphere", "arguments": {"show": true}}',
+    explanation: 'Show sky atmosphere',
+  },
+  {
+    category: 'scene',
+    tool: 'setAtmosphere',
+    userInput: 'Hide the atmosphere',
+    response: '{"tool": "setAtmosphere", "arguments": {"show": false}}',
+    explanation: 'Disable atmosphere',
+  },
+  {
+    category: 'scene',
+    tool: 'setAtmosphere',
+    userInput: 'Make the sky more saturated',
+    response: '{"tool": "setAtmosphere", "arguments": {"show": true, "saturationShift": 0.5}}',
+    explanation: 'Increase atmosphere saturation',
+  },
+  {
+    category: 'scene',
+    tool: 'setGlobe',
+    userInput: 'Show the globe',
+    response: '{"tool": "setGlobe", "arguments": {"show": true}}',
+    explanation: 'Make globe visible',
+  },
+  {
+    category: 'scene',
+    tool: 'setGlobe',
+    userInput: 'Turn on ground atmosphere',
+    response: '{"tool": "setGlobe", "arguments": {"showGroundAtmosphere": true}}',
+    explanation: 'Enable ground-level atmosphere effect',
+  },
+  {
+    category: 'scene',
+    tool: 'setGlobe',
+    userInput: 'Change ocean color to dark blue',
+    response: '{"tool": "setGlobe", "arguments": {"baseColor": "darkblue"}}',
+    explanation: 'Change globe base color',
+  },
+
+  // ============ DATA LOADING EXAMPLES ============
+  {
+    category: 'data',
+    tool: 'loadGeoJSON',
+    userInput: 'Import GeoJSON boundaries',
+    response: '{"tool": "loadGeoJSON", "arguments": {"url": "https://example.com/boundaries.geojson", "name": "Boundaries"}}',
+    explanation: 'Load GeoJSON data',
+  },
+  {
+    category: 'data',
+    tool: 'loadGeoJSON',
+    userInput: 'Load the parks GeoJSON with green fill',
+    response: '{"tool": "loadGeoJSON", "arguments": {"url": "https://example.com/parks.geojson", "name": "Parks", "fill": "green", "stroke": "darkgreen"}}',
+    explanation: 'GeoJSON with styling',
+  },
+  {
+    category: 'data',
+    tool: 'loadKML',
+    userInput: 'Import the flight path KML',
+    response: '{"tool": "loadKML", "arguments": {"url": "https://example.com/flight.kml", "name": "Flight Path"}}',
+    explanation: 'Load KML data',
+  },
+  {
+    category: 'data',
+    tool: 'loadKML',
+    userInput: 'Load KMZ and clamp to terrain',
+    response: '{"tool": "loadKML", "arguments": {"url": "https://example.com/data.kmz", "name": "KMZ Data", "clampToGround": true}}',
+    explanation: 'KMZ with terrain clamping',
+  },
+  {
+    category: 'data',
+    tool: 'loadCZML',
+    userInput: 'Load the satellite orbits CZML',
+    response: '{"tool": "loadCZML", "arguments": {"url": "https://example.com/satellites.czml", "name": "Satellite Orbits"}}',
+    explanation: 'Load CZML time-dynamic data',
+  },
+  {
+    category: 'data',
+    tool: 'loadCZML',
+    userInput: 'Import CZML animation',
+    response: '{"tool": "loadCZML", "arguments": {"url": "https://example.com/animation.czml", "name": "Animation"}}',
+    explanation: 'Load animated CZML',
+  },
+
+  // ============ DISAMBIGUATION EXAMPLES ============
+  {
+    category: 'disambiguation',
+    tool: 'addSphere',
+    userInput: 'Add a 3D ball',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 0, "latitude": 0, "radius": 10000, "name": "Ball", "color": "red"}}',
+    explanation: '3D ball is a sphere (use addSphere)',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addCircle',
+    userInput: 'Draw a circle on the ground',
+    response: '{"tool": "addCircle", "arguments": {"longitude": 0, "latitude": 0, "radius": 10000, "name": "Circle", "color": "yellow"}}',
+    explanation: 'Flat circle on ground (use addCircle)',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addSphere',
+    userInput: 'Create a spherical marker',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 0, "latitude": 0, "radius": 500, "name": "Marker", "color": "red"}}',
+    explanation: 'Spherical marker is a sphere',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addCircle',
+    userInput: 'Add a flat disk at London',
+    response: '{"tool": "addCircle", "arguments": {"longitude": -0.1276, "latitude": 51.5074, "radius": 5000, "name": "Disk", "color": "blue"}}',
+    explanation: 'Flat disk is a circle',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'flyTo',
+    userInput: 'Go to Tokyo',
+    response: '{"tool": "flyTo", "arguments": {"longitude": 139.6917, "latitude": 35.6895, "height": 500000, "duration": 3}}',
+    explanation: 'Go to location uses flyTo',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'flyToEntity',
+    userInput: 'Go to the red sphere',
+    response: '{"tool": "flyToEntity", "arguments": {"entityId": "red sphere", "duration": 3}}',
+    explanation: 'Go to existing entity uses flyToEntity',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'flyTo',
+    userInput: 'Navigate to Sydney',
+    response: '{"tool": "flyTo", "arguments": {"longitude": 151.2093, "latitude": -33.8688, "height": 500000, "duration": 3}}',
+    explanation: 'Navigate to place uses flyTo',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'flyToEntity',
+    userInput: 'Navigate to the marker called Tokyo',
+    response: '{"tool": "flyToEntity", "arguments": {"entityId": "Tokyo", "duration": 3}}',
+    explanation: 'Navigate to named entity uses flyToEntity',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addSphere',
+    userInput: 'Make a round object at Paris',
+    response: '{"tool": "addSphere", "arguments": {"longitude": 2.3522, "latitude": 48.8566, "radius": 1000, "name": "Round Object", "color": "red"}}',
+    explanation: 'Round 3D object is a sphere',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addCircle',
+    userInput: 'Draw a ring around the building',
+    response: '{"tool": "addCircle", "arguments": {"longitude": 0, "latitude": 0, "radius": 100, "name": "Ring", "color": "white"}}',
+    explanation: 'Ring/flat circular area uses addCircle',
+  },
 ] as const;
 
 /**
@@ -1494,50 +1924,159 @@ export function buildSystemPrompt(tools: ToolDefinition[]): string {
 
 /**
  * Compact system prompt for models with small context windows (< 8k tokens)
- * Omits known locations list and uses minimal examples
+ * Includes all 85 tools grouped by category with clear descriptions
  */
 const COMPACT_SYSTEM_PROMPT = `You are a CesiumJS globe controller. Output ONLY JSON tool calls.
 
 FORMAT: {"tool": "toolName", "arguments": {...}}
 
-TOOLS:
-- flyTo: Navigate camera. Args: longitude, latitude, height (meters), duration (seconds)
-- lookAt: Orient camera. Args: longitude, latitude, range
-- zoom: Zoom in/out. Args: amount (positive=in, negative=out)
-- addPoint: Add marker. Args: longitude, latitude, name, color
-- addLabel: Add text. Args: longitude, latitude, text, color
-- addPolyline: Draw line. Args: positions (array of {longitude, latitude}), name, color
-- addPolygon: Draw filled shape. Args: positions, name, color, extrudedHeight (optional)
-- addCircle: Draw circle. Args: longitude, latitude, radius (meters), name, color
-- removeEntity: Remove by name. Args: id
-- clearAll: Remove all. Args: {}
-- setSceneMode: Change view. Args: mode ("2D", "3D", "COLUMBUS_VIEW")
+=== CAMERA (11 tools) ===
+flyTo: Fly to location. Args: longitude, latitude, height, duration
+setView: Instant teleport. Args: longitude, latitude, height, heading, pitch
+lookAt: Orient toward target. Args: longitude, latitude, range
+zoom: Zoom in/out. Args: amount (positive=in, negative=out)
+getCamera: Get position. Args: {}
+rotateCamera: Rotate view. Args: heading, pitch (degrees)
+trackEntity: Follow moving entity. Args: entityId
+stopTracking: Stop following. Args: {}
+orbitTarget: Circle around location. Args: longitude, latitude, duration, radius
+stopOrbit: Stop orbiting. Args: {}
+flyToEntity: Fly to existing entity. Args: entityId, duration, heading, pitch, range
 
-COMMON LOCATIONS:
-- New York: -74.006, 40.7128
-- London: -0.1276, 51.5074
-- Paris: 2.3522, 48.8566
-- Tokyo: 139.6917, 35.6895
-- Sydney: 151.2093, -33.8688
-- Washington DC: -77.0369, 38.9072
-- Eiffel Tower: 2.2945, 48.8584
-- Statue of Liberty: -74.0445, 40.6892
+=== 3D SHAPES (8 tools) ===
+addSphere: 3D ball/sphere. Args: longitude, latitude, radius, name, color, height
+addEllipsoid: 3D ellipsoid. Args: longitude, latitude, radiiX, radiiY, radiiZ, name, color
+addBox: 3D box/cube. Args: longitude, latitude, dimensionX, dimensionY, dimensionZ, name, color
+addCylinder: Cylinder/cone. Args: longitude, latitude, length, topRadius, bottomRadius, name, color
+addCorridor: Road/path with width. Args: positions[], width, name, color, extrudedHeight
+addWall: Vertical wall. Args: positions[], maximumHeights[], minimumHeights[], name, color
+addRectangle: Rectangle bounds. Args: west, south, east, north, name, color, extrudedHeight
+addModel: 3D glTF model. Args: longitude, latitude, url, scale, name
+
+=== 2D ENTITIES (9 tools) ===
+addPoint: Marker/pin. Args: longitude, latitude, name, color
+addLabel: Text label. Args: longitude, latitude, text, color, font
+addPolyline: Line between points. Args: positions[], name, color, width
+addPolygon: Filled shape. Args: positions[], name, color, extrudedHeight
+addCircle: Flat circle on ground. Args: longitude, latitude, radius, name, color
+addBillboard: Image marker. Args: longitude, latitude, image, name, scale
+addGlowingPolyline: Glowing line. Args: positions[], name, color, glowPower
+addDashedPolyline: Dashed line. Args: positions[], name, color, dashLength
+addArrowPolyline: Arrow line. Args: positions[], name, color, width
+addOutlinedPolyline: Line with outline. Args: positions[], color, outlineColor, outlineWidth
+
+=== ENTITY MANAGEMENT (7 tools) ===
+removeEntity: Delete entity. Args: id
+clearAll: Remove all entities. Args: {}
+showEntity: Make visible. Args: entityId
+hideEntity: Make invisible. Args: entityId
+selectEntity: Highlight entity. Args: entityId
+listEntities: Get all entities. Args: {}
+getEntityInfo: Get entity details. Args: entityId
+
+=== SCENE (13 tools) ===
+setSceneMode: Change view mode. Args: mode ("2D"|"3D"|"COLUMBUS_VIEW")
+setFog: Atmospheric fog. Args: enabled, density
+setShadows: Shadow rendering. Args: enabled, softShadows
+setLighting: Sun lighting. Args: enableLighting
+setAtmosphere: Sky atmosphere. Args: show, hueShift, brightnessShift
+setGlobe: Globe settings. Args: show, showGroundAtmosphere, baseColor
+enableDepthTest: Depth against terrain. Args: enabled
+setSkybox: Show/hide stars. Args: show
+enableFXAA: Anti-aliasing. Args: enabled
+setBloom: Glow effect. Args: enabled, brightness
+setTerrainProvider: Change terrain. Args: provider, url
+enableDepthTestAgainstTerrain: Terrain occlusion. Args: enabled
+setGlobeTranslucency: Globe transparency. Args: enabled, alpha
+
+=== DATA LOADING (6 tools) ===
+loadGeoJSON: Load GeoJSON. Args: url, name, stroke, fill
+loadKML: Load KML/KMZ. Args: url, name, clampToGround
+loadCZML: Load CZML. Args: url, name
+loadGPX: Load GPX track. Args: url, name, clampToGround
+addWMS: Add WMS layer. Args: url, layers, name
+generateCZML: Create CZML doc. Args: entities[], documentName
+
+=== TIME (4 tools) ===
+setTime: Set simulation time. Args: time (ISO 8601), multiplier
+playAnimation: Start animation. Args: {}
+pauseAnimation: Pause animation. Args: {}
+setAnimationSpeed: Change speed. Args: multiplier (negative=reverse)
+
+=== IMAGERY (5 tools) ===
+removeImagery: Remove layer. Args: index
+setImageryAlpha: Layer transparency. Args: index, alpha
+setImageryBrightness: Brightness/saturation. Args: index, brightness, saturation
+splitImagery: Side-by-side compare. Args: enabled, position
+addImagery: Add imagery layer. Args: provider, url, layer
+
+=== 3D TILES (5 tools) ===
+load3DTiles: Load tileset. Args: id, url, assetId
+style3DTiles: Style tileset. Args: id, color
+remove3DTiles: Remove tileset. Args: id
+highlight3DTile: Highlight tileset. Args: id, color
+clip3DTiles: Clip tileset. Args: id, enabled, distance
+
+=== TERRAIN (4 tools) ===
+setTerrainExaggeration: Vertical scale. Args: factor
+sampleTerrainHeight: Get elevation. Args: longitude, latitude
+clipTerrain: Clip terrain. Args: enabled, height
+enableTerrainLighting: Terrain shadows. Args: enabled
+
+=== MATERIALS (4 tools) ===
+setImageMaterial: Texture image. Args: entityId, imageUrl, repeatX, repeatY
+setGridMaterial: Grid pattern. Args: entityId, color, lineCountX, lineCountY
+setStripeMaterial: Stripes. Args: entityId, evenColor, oddColor, orientation, repeat
+setCheckerboardMaterial: Checkerboard. Args: entityId, evenColor, oddColor, repeatX, repeatY
+
+=== PICKING (3 tools) ===
+getScreenPosition: Coords to pixels. Args: longitude, latitude
+getCartographic: Pixels to coords. Args: x, y
+pickEntity: Entity at pixel. Args: x, y
+
+=== EFFECTS (6 tools) ===
+addParticleSystem: Particles. Args: id, longitude, latitude, particleType (fire|smoke|explosion)
+addWeatherEffect: Weather. Args: effectType (rain|snow|fog), intensity
+addVolumetricCloud: Cloud. Args: id, longitude, latitude, height, scale
+addLensFlare: Sun glare. Args: enabled, intensity
+removeParticleSystem: Remove particles. Args: id
+removeWeatherEffect: Remove weather. Args: effectType
+
+=== MEASUREMENT (1 tool) ===
+measureDistance: Distance between points. Args: start{longitude,latitude}, end{longitude,latitude}
+
+LOCATIONS: NYC(-74.006,40.7128) London(-0.1276,51.5074) Paris(2.3522,48.8566) Tokyo(139.6917,35.6895) DC(-77.0369,38.9072) Sydney(151.2093,-33.8688) EiffelTower(2.2945,48.8584)
+
+IMPORTANT DISTINCTIONS:
+- sphere/ball → addSphere (3D volume floating above ground)
+- circle → addCircle (flat 2D shape on ground)
+- "fly to Paris" → flyTo (navigate to location)
+- "fly to the marker" → flyToEntity (navigate to existing entity)
+- marker/point/pin → addPoint
 
 EXAMPLES:
-User: "Show me Paris"
-{"tool": "flyTo", "arguments": {"longitude": 2.3522, "latitude": 48.8566, "height": 500000, "duration": 3}}
+"fly to Paris" → {"tool":"flyTo","arguments":{"longitude":2.3522,"latitude":48.8566,"height":500000,"duration":3}}
+"add sphere at Tokyo" → {"tool":"addSphere","arguments":{"longitude":139.6917,"latitude":35.6895,"radius":1000,"name":"Sphere","color":"red"}}
+"put a ball over London" → {"tool":"addSphere","arguments":{"longitude":-0.1276,"latitude":51.5074,"radius":5000,"name":"Ball","color":"red"}}
+"large 50km red sphere NYC" → {"tool":"addSphere","arguments":{"longitude":-74.006,"latitude":40.7128,"radius":50000,"name":"Sphere","color":"red"}}
+"sphere 10km above DC" → {"tool":"addSphere","arguments":{"longitude":-77.0369,"latitude":38.9072,"radius":5000,"height":10000,"name":"Sphere","color":"red"}}
+"draw circle around Paris" → {"tool":"addCircle","arguments":{"longitude":2.3522,"latitude":48.8566,"radius":10000,"name":"Circle","color":"yellow"}}
+"set view instantly to Tokyo" → {"tool":"setView","arguments":{"longitude":139.6917,"latitude":35.6895,"height":500000}}
+"rotate camera 90 degrees right" → {"tool":"rotateCamera","arguments":{"heading":90}}
+"follow the airplane" → {"tool":"trackEntity","arguments":{"entityId":"airplane"}}
+"stop following" → {"tool":"stopTracking","arguments":{}}
+"orbit around Eiffel Tower" → {"tool":"orbitTarget","arguments":{"longitude":2.2945,"latitude":48.8584,"duration":30}}
+"enable fog" → {"tool":"setFog","arguments":{"enabled":true}}
+"turn on shadows" → {"tool":"setShadows","arguments":{"enabled":true}}
+"enable sun lighting" → {"tool":"setLighting","arguments":{"enableLighting":true}}
+"show atmosphere" → {"tool":"setAtmosphere","arguments":{"show":true}}
+"hide globe" → {"tool":"setGlobe","arguments":{"show":false}}
+"load geojson from url" → {"tool":"loadGeoJSON","arguments":{"url":"https://...","name":"Data"}}
+"fly to the marker" → {"tool":"flyToEntity","arguments":{"entityId":"marker","duration":3}}
+"clear all" → {"tool":"clearAll","arguments":{}}
 
-User: "Add a red marker at New York"
-{"tool": "addPoint", "arguments": {"longitude": -74.006, "latitude": 40.7128, "name": "New York", "color": "red"}}
-
-User: "Draw a line from London to Paris"
-{"tool": "addPolyline", "arguments": {"positions": [{"longitude": -0.1276, "latitude": 51.5074}, {"longitude": 2.3522, "latitude": 48.8566}], "name": "Route", "color": "blue"}}
-
-User: "Clear everything"
-{"tool": "clearAll", "arguments": {}}
-
-HEIGHT GUIDE: City=500000, Landmark=50000, Building=1000
-COLORS: red, green, blue, yellow, orange, purple, pink, cyan, white, black, gray`;
+HEIGHT: City=500000 Landmark=50000 Building=1000 Street=500
+COLORS: red green blue yellow orange purple pink cyan white black gray`;
 
 /**
  * Build a compact system prompt for small context window models

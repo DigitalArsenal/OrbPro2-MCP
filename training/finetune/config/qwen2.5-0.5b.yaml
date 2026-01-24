@@ -1,0 +1,72 @@
+# Qwen2.5-0.5B Fine-tuning Configuration
+# Optimized for CesiumJS command generation
+
+# Model settings
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: bfloat16
+
+# LoRA configuration
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: none
+  task_type: CAUSAL_LM
+
+# Data settings
+data:
+  max_length: 512
+  template: chatml
+  system_prompt: |
+    You are an AI assistant that controls CesiumJS. Your task is to convert natural language commands into JSON tool calls. Always respond with valid JSON containing a "tool" field and an "arguments" field.
+
+# Training hyperparameters
+training:
+  epochs: 3
+  batch_size: 8
+  gradient_accumulation_steps: 2
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  lr_scheduler: cosine
+
+  # Precision
+  fp16: false
+  bf16: true
+
+  # Logging and saving
+  logging_steps: 10
+  save_steps: 500
+  eval_steps: 500
+  save_total_limit: 3
+
+  # Optimization
+  optim: adamw_torch
+  seed: 42
+
+# Evaluation settings
+eval:
+  metrics:
+    - tool_accuracy
+    - json_validity
+    - coordinate_precision
+    - exact_match
+  test_split: 0.1
+
+# Export settings
+export:
+  quantization: q4f16_1
+  target: webgpu
+  model_id: cesium-slm-qwen-0.5b
+  context_window: 4096

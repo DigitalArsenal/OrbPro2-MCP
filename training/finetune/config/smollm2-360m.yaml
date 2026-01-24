@@ -1,0 +1,71 @@
+# SmolLM2-360M Fine-tuning Configuration
+# Ultra-lightweight model for mobile/edge deployment
+
+# Model settings
+model:
+  name: HuggingFaceTB/SmolLM2-360M-Instruct
+  trust_remote_code: true
+  torch_dtype: bfloat16
+
+# LoRA configuration (smaller rank for smaller model)
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  bias: none
+  task_type: CAUSAL_LM
+
+# Data settings
+data:
+  max_length: 384  # Shorter for smaller model
+  template: alpaca  # Simpler template for smaller model
+  system_prompt: |
+    Convert commands to JSON with tool and arguments.
+
+# Training hyperparameters (adjusted for smaller model)
+training:
+  epochs: 5  # More epochs for smaller model
+  batch_size: 16  # Larger batch size possible
+  gradient_accumulation_steps: 1
+  learning_rate: 3.0e-4  # Slightly higher LR
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  lr_scheduler: cosine
+
+  # Precision
+  fp16: false
+  bf16: true
+
+  # Logging and saving
+  logging_steps: 10
+  save_steps: 500
+  eval_steps: 500
+  save_total_limit: 3
+
+  # Optimization
+  optim: adamw_torch
+  seed: 42
+
+# Evaluation settings
+eval:
+  metrics:
+    - tool_accuracy
+    - json_validity
+    - coordinate_precision
+  test_split: 0.1
+
+# Export settings
+export:
+  quantization: q4f16_1
+  target: webgpu
+  model_id: cesium-slm-smollm-360m
+  context_window: 2048  # Smaller context for smaller model

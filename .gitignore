@@ -34,5 +34,11 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# Training data (large)
-training/
+# Training data (generated, can regenerate with npx tsx training/generate-training-data.ts)
+training/generated-training-data.jsonl
+training/finetune/output/
+training/*.bin
+training/*.safetensors
+
+# MLC compiled models (11GB+, download or compile separately)
+mlc-models/

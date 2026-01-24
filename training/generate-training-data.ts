@@ -328,6 +328,84 @@ const ADD_CIRCLE_TEMPLATES = [
   'Draw a {radius} kilometer radius circle at {location}',
   'Create a circular area of {radius}km around {location}',
   'Add a {radius}km radius circle centered on {location}',
+  'Draw a flat circle at {location}',
+  'Add an ellipse around {location}',
+];
+
+// 3D Shape Templates - IMPORTANT: These create 3D volumes, not flat shapes
+const ADD_SPHERE_TEMPLATES = [
+  'Add a {color} sphere at {location}',
+  'Put a sphere over {location}',
+  'Create a sphere at {location}',
+  'Add a {radius}km sphere to {location}',
+  'Put a {radius}km radius sphere at {location}',
+  'Add a sphere to {location} {radius}km in radius',
+  'Create a {color} sphere over {location}',
+  'Add a ball at {location}',
+  'Put a ball over {location}',
+  'Create a 3D sphere at {location}',
+  'Add a {color} ball at {location}',
+  'Place a sphere at {location}',
+  'Add a sphere {radius}km in radius at {location}',
+  'I want a sphere at {location}',
+  'Add a sphere to {location}',
+  'Put a {color} sphere over {location}',
+  'Create a large sphere at {location}',
+  'Add a {radius} kilometer sphere to {location}',
+  'Make a sphere at {location}',
+  'Show a sphere at {location}',
+  'Add a sphere above {location}',
+  'Put a sphere over {location} with {radius}km radius',
+  'Add a {radius}km sphere above {location}',
+  'Create a sphere {radius}km in radius at {location} {height}km above the ground',
+];
+
+const ADD_BOX_TEMPLATES = [
+  'Add a box at {location}',
+  'Put a {color} box at {location}',
+  'Create a cube at {location}',
+  'Add a 3D box at {location}',
+  'Place a box over {location}',
+  'Add a rectangular box at {location}',
+];
+
+const ADD_CYLINDER_TEMPLATES = [
+  'Add a cylinder at {location}',
+  'Put a {color} cylinder at {location}',
+  'Create a cylinder at {location}',
+  'Add a tall cylinder at {location}',
+  'Create a cone at {location}',
+  'Add a {color} cone at {location}',
+];
+
+const ADD_CORRIDOR_TEMPLATES = [
+  'Draw a corridor from {loc1} to {loc2}',
+  'Create a road from {loc1} to {loc2}',
+  'Add a {width}m wide corridor from {loc1} to {loc2}',
+  'Draw a path {width} meters wide from {loc1} to {loc2}',
+];
+
+const ADD_WALL_TEMPLATES = [
+  'Create a wall around {location}',
+  'Add walls around {location}',
+  'Build a wall at {location}',
+];
+
+const ADD_RECTANGLE_TEMPLATES = [
+  'Draw a rectangle at {location}',
+  'Add a {color} rectangle over {location}',
+  'Create a rectangular area at {location}',
+];
+
+const FLY_TO_ENTITY_TEMPLATES = [
+  'Fly to the {entityName}',
+  'Go to the {entityName}',
+  'Zoom to the {entityName}',
+  'Navigate to the {entityName}',
+  'Show me the {entityName}',
+  'Fly to {entityName}',
+  'Go to {entityName}',
+  'Zoom to {entityName}',
 ];
 
 const ZOOM_IN_TEMPLATES = [
@@ -413,9 +491,326 @@ const TIME_TEMPLATES = {
   ],
 };
 
+// ============================================================================
+// Camera Control Templates
+// ============================================================================
+
+const SET_VIEW_TEMPLATES = [
+  'Jump to {location}',
+  'Teleport to {location}',
+  'Instantly go to {location}',
+  'Set camera to {location}',
+  'Position camera at {location}',
+  'Set view to {location}',
+  'Snap to {location}',
+  'Immediately show {location}',
+  'Quick jump to {location}',
+  'Instant view of {location}',
+  'Set the view to {location}',
+  'Position at {location}',
+  'Snap the camera to {location}',
+  'Instantly move to {location}',
+  'Teleport the camera to {location}',
+  'Jump the view to {location}',
+  'Set camera position at {location}',
+  'Quick teleport to {location}',
+  'Instant jump to {location}',
+  'Set the camera at {location}',
+  'Snap view to {location}',
+  'Immediately go to {location}',
+  'Position view at {location}',
+  'Direct jump to {location}',
+  'Set my position at {location}',
+  'Teleport me to {location}',
+  'Jump camera to {location}',
+  'Set location to {location}',
+  'Instant move to {location}',
+  'Quick snap to {location}',
+  'Immediately position at {location}',
+  'Set position at {location}',
+  'Jump view to {location}',
+  'Snap camera at {location}',
+  'Instant position at {location}',
+  'Set my view to {location}',
+];
+
+const GET_CAMERA_TEMPLATES = [
+  'Where am I?',
+  "What's my position?",
+  'Camera location',
+  'Current position',
+  'Show coordinates',
+  'Get camera position',
+  "What's the current location?",
+  'Show my coordinates',
+  'Where is the camera?',
+  "What's the camera position?",
+  'Current camera location',
+  'Get current position',
+  'Show current coordinates',
+  'Tell me my position',
+  'What are my coordinates?',
+  'Where am I looking?',
+  'Get my location',
+  'Show camera position',
+  'Current view position',
+  "What's the view location?",
+  'Report camera position',
+  'Get coordinates',
+  'Camera coordinates',
+  'View coordinates',
+  'Position info',
+  'Location info',
+  'Show position',
+  'Display coordinates',
+  'Get location',
+  'What coordinates am I at?',
+  'Show my position',
+  'Report position',
+  'Camera info',
+  'View info',
+  'Position report',
+  'Get view position',
+];
+
+const ROTATE_CAMERA_TEMPLATES = [
+  'Turn left',
+  'Turn right',
+  'Look up',
+  'Look down',
+  'Pan camera left',
+  'Pan camera right',
+  'Rotate view left',
+  'Rotate view right',
+  'Tilt up',
+  'Tilt down',
+  'Pan left',
+  'Pan right',
+  'Rotate left',
+  'Rotate right',
+  'Turn the camera left',
+  'Turn the camera right',
+  'Rotate the view up',
+  'Rotate the view down',
+  'Look left',
+  'Look right',
+  'Swivel left',
+  'Swivel right',
+  'Pivot left',
+  'Pivot right',
+  'Turn view left',
+  'Turn view right',
+  'Pan the camera up',
+  'Pan the camera down',
+  'Tilt the camera up',
+  'Tilt the camera down',
+  'Spin left',
+  'Spin right',
+  'Rotate camera left',
+  'Rotate camera right',
+  'Move view left',
+  'Move view right',
+  'Shift view left',
+  'Shift view right',
+];
+
+const TRACK_ENTITY_TEMPLATES = [
+  'Follow the {entityType}',
+  'Track the {entityType}',
+  'Keep eye on the {entityType}',
+  'Watch the {entityType}',
+  'Follow {entityName}',
+  'Track {entityName}',
+  'Keep following the {entityType}',
+  'Stay on the {entityType}',
+  'Lock on to the {entityType}',
+  'Lock onto {entityName}',
+  'Keep tracking the {entityType}',
+  'Follow along with the {entityType}',
+  'Stay with the {entityType}',
+  'Keep watching the {entityType}',
+  'Monitor the {entityType}',
+  'Pursue the {entityType}',
+  'Chase the {entityType}',
+  'Trail the {entityType}',
+  'Shadow the {entityType}',
+  'Keep up with the {entityType}',
+  'Follow that {entityType}',
+  'Track that {entityType}',
+  'Watch that {entityType}',
+  'Focus on the {entityType}',
+  'Lock camera on {entityName}',
+  'Keep camera on {entityName}',
+  'Follow entity {entityName}',
+  'Track entity {entityName}',
+  'Attach to the {entityType}',
+  'Attach camera to {entityName}',
+];
+
+// ============================================================================
+// Data Loading Templates
+// ============================================================================
+
+const LOAD_GEOJSON_TEMPLATES = [
+  'Load GeoJSON from {url}',
+  'Import GeoJSON {url}',
+  'Open GeoJSON file {url}',
+  'Load the GeoJSON {url}',
+  'Import GeoJSON data from {url}',
+  'Open GeoJSON {url}',
+  'Load GeoJSON data {url}',
+  'Fetch GeoJSON from {url}',
+  'Get GeoJSON {url}',
+  'Add GeoJSON from {url}',
+  'Read GeoJSON {url}',
+  'Parse GeoJSON {url}',
+  'Load GeoJSON file from {url}',
+  'Import GeoJSON file {url}',
+  'Display GeoJSON from {url}',
+  'Show GeoJSON {url}',
+  'Render GeoJSON from {url}',
+  'Load geo JSON from {url}',
+  'Import geo json {url}',
+  'Add GeoJSON data from {url}',
+];
+
+const LOAD_KML_TEMPLATES = [
+  'Load KML from {url}',
+  'Import KML {url}',
+  'Open KML file {url}',
+  'Load the KML {url}',
+  'Import KML data from {url}',
+  'Open KMZ {url}',
+  'Load KMZ file {url}',
+  'Load KMZ from {url}',
+  'Import KMZ {url}',
+  'Open KMZ file {url}',
+  'Fetch KML from {url}',
+  'Get KML {url}',
+  'Add KML from {url}',
+  'Read KML {url}',
+  'Load KML file from {url}',
+  'Import KML file {url}',
+  'Display KML from {url}',
+  'Show KML {url}',
+  'Load Google Earth file {url}',
+  'Import Google Earth data {url}',
+];
+
+const LOAD_CZML_TEMPLATES = [
+  'Load CZML from {url}',
+  'Import CZML data {url}',
+  'Open CZML file {url}',
+  'Load the CZML {url}',
+  'Import CZML from {url}',
+  'Open CZML {url}',
+  'Load CZML data {url}',
+  'Fetch CZML from {url}',
+  'Get CZML {url}',
+  'Add CZML from {url}',
+  'Read CZML {url}',
+  'Parse CZML {url}',
+  'Load CZML file from {url}',
+  'Import CZML file {url}',
+  'Display CZML from {url}',
+  'Show CZML {url}',
+  'Load Cesium data from {url}',
+  'Import Cesium animation {url}',
+  'Load animation data {url}',
+  'Import time-dynamic data {url}',
+];
+
 const COLORS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'cyan', 'white', 'black', 'gray'];
 
 const RADII = [10, 25, 50, 100, 200, 500, 1000];
+
+// Entity types for tracking
+const ENTITY_TYPES = [
+  'satellite',
+  'aircraft',
+  'plane',
+  'ship',
+  'vehicle',
+  'drone',
+  'rocket',
+  'station',
+  'target',
+  'object',
+  'marker',
+  'point',
+  'vessel',
+  'helicopter',
+  'car',
+  'truck',
+  'train',
+  'balloon',
+  'missile',
+  'projectile',
+];
+
+// Sample entity names for tracking
+const ENTITY_NAMES = [
+  'ISS',
+  'Hubble',
+  'Dragon',
+  'Starlink-1',
+  'GPS-IIF',
+  'Flight-123',
+  'Ship-Alpha',
+  'Drone-7',
+  'Rocket-X',
+  'Target-1',
+  'Vehicle-A',
+  'Station-3',
+  'Sat-42',
+  'Object-9',
+  'Aircraft-B',
+  'Helicopter-2',
+  'Vessel-5',
+  'Train-Express',
+  'Balloon-High',
+  'Projectile-M',
+];
+
+// Sample URLs for data loading
+const SAMPLE_URLS = {
+  geojson: [
+    'https://example.com/data.geojson',
+    'https://api.example.com/features.json',
+    'https://data.gov/boundaries.geojson',
+    'https://maps.example.org/points.geojson',
+    '/data/local-features.geojson',
+    './assets/regions.geojson',
+    'https://cdn.example.com/cities.geojson',
+    'https://geodata.example.net/countries.json',
+    'https://api.mapbox.com/data.geojson',
+    'https://storage.example.com/parcels.geojson',
+  ],
+  kml: [
+    'https://example.com/data.kml',
+    'https://earth.google.com/places.kml',
+    'https://maps.example.org/tour.kmz',
+    '/data/local-places.kml',
+    './assets/landmarks.kmz',
+    'https://cdn.example.com/routes.kml',
+    'https://geodata.example.net/overlay.kmz',
+    'https://storage.example.com/markers.kml',
+    'https://api.example.com/export.kml',
+    'https://data.gov/features.kmz',
+  ],
+  czml: [
+    'https://example.com/animation.czml',
+    'https://cesium.com/data/satellites.czml',
+    'https://api.example.org/trajectory.czml',
+    '/data/local-animation.czml',
+    './assets/simulation.czml',
+    'https://cdn.example.com/orbits.czml',
+    'https://geodata.example.net/timeline.czml',
+    'https://storage.example.com/tracking.czml',
+    'https://api.example.com/flight-path.czml',
+    'https://data.gov/dynamic-data.czml',
+  ],
+};
 
 const LABEL_TEXTS = [
   'Hello',
@@ -599,6 +994,214 @@ function generateAddCircleExample(): { instruction: string; output: string } {
   return { instruction, output };
 }
 
+// ============================================================================
+// 3D Shape Generators
+// ============================================================================
+
+function generateAddSphereExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const radius = randomChoice(RADII);
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_SPHERE_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+  const height = Math.random() > 0.7 ? randomChoice([1, 5, 10, 20, 50]) : undefined;
+
+  let instruction = template
+    .replace(/{location}/g, nameOrAlias)
+    .replace(/{radius}/g, radius.toString())
+    .replace(/{color}/g, color);
+
+  if (height !== undefined) {
+    instruction = instruction.replace(/{height}/g, height.toString());
+  } else {
+    // Remove height placeholder if not used
+    instruction = instruction.replace(/ {height}km above the ground/g, '');
+  }
+
+  const args: Record<string, unknown> = {
+    longitude: location.longitude,
+    latitude: location.latitude,
+    radius: radius * 1000, // Convert km to meters
+    name: `${location.name} Sphere`,
+    color,
+  };
+
+  if (height !== undefined) {
+    args.height = height * 1000; // Convert km to meters
+  }
+
+  const output = JSON.stringify({
+    tool: 'addSphere',
+    arguments: args,
+  });
+
+  return { instruction, output };
+}
+
+function generateAddBoxExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_BOX_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+  const size = randomChoice([100, 200, 500, 1000, 2000]);
+
+  const instruction = template
+    .replace('{location}', nameOrAlias)
+    .replace('{color}', color);
+
+  const output = JSON.stringify({
+    tool: 'addBox',
+    arguments: {
+      longitude: location.longitude,
+      latitude: location.latitude,
+      dimensionX: size,
+      dimensionY: size,
+      dimensionZ: size * 2,
+      name: `${location.name} Box`,
+      color,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateAddCylinderExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_CYLINDER_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+  const isCone = template.includes('cone');
+
+  const instruction = template
+    .replace('{location}', nameOrAlias)
+    .replace('{color}', color);
+
+  const output = JSON.stringify({
+    tool: 'addCylinder',
+    arguments: {
+      longitude: location.longitude,
+      latitude: location.latitude,
+      length: randomChoice([100, 300, 500, 1000]),
+      topRadius: isCone ? 0 : randomChoice([50, 100, 200]),
+      bottomRadius: randomChoice([50, 100, 200]),
+      name: isCone ? `${location.name} Cone` : `${location.name} Cylinder`,
+      color,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateAddCorridorExample(): { instruction: string; output: string } {
+  const locations = shuffle(LOCATIONS).slice(0, 2);
+  const loc1 = locations[0]!;
+  const loc2 = locations[1]!;
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_CORRIDOR_TEMPLATES);
+  const width = randomChoice([10, 50, 100, 500]);
+
+  const instruction = template
+    .replace('{loc1}', loc1.name)
+    .replace('{loc2}', loc2.name)
+    .replace('{color}', color)
+    .replace('{width}', width.toString());
+
+  const output = JSON.stringify({
+    tool: 'addCorridor',
+    arguments: {
+      positions: [
+        { longitude: loc1.longitude, latitude: loc1.latitude },
+        { longitude: loc2.longitude, latitude: loc2.latitude },
+      ],
+      width,
+      name: `${loc1.name} to ${loc2.name} Corridor`,
+      color,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateAddWallExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_WALL_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+
+  const instruction = template
+    .replace('{location}', nameOrAlias)
+    .replace('{color}', color);
+
+  // Create a simple square wall around the location
+  const offset = 0.01; // About 1km
+  const positions = [
+    { longitude: location.longitude - offset, latitude: location.latitude + offset },
+    { longitude: location.longitude + offset, latitude: location.latitude + offset },
+    { longitude: location.longitude + offset, latitude: location.latitude - offset },
+    { longitude: location.longitude - offset, latitude: location.latitude - offset },
+    { longitude: location.longitude - offset, latitude: location.latitude + offset }, // Close the loop
+  ];
+
+  const output = JSON.stringify({
+    tool: 'addWall',
+    arguments: {
+      positions,
+      maximumHeights: [500, 500, 500, 500, 500],
+      minimumHeights: [0, 0, 0, 0, 0],
+      name: `${location.name} Wall`,
+      color,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateAddRectangleExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const color = randomChoice(COLORS);
+  const template = randomChoice(ADD_RECTANGLE_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+
+  const instruction = template
+    .replace('{location}', nameOrAlias)
+    .replace('{color}', color);
+
+  const offset = 0.05; // About 5km
+
+  const output = JSON.stringify({
+    tool: 'addRectangle',
+    arguments: {
+      west: location.longitude - offset,
+      south: location.latitude - offset,
+      east: location.longitude + offset,
+      north: location.latitude + offset,
+      name: `${location.name} Rectangle`,
+      color,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateFlyToEntityExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const template = randomChoice(FLY_TO_ENTITY_TEMPLATES);
+  const entitySuffix = randomChoice(['Sphere', 'Box', 'Marker', 'Point', 'Label']);
+  const entityName = `${location.name} ${entitySuffix}`;
+
+  const instruction = template.replace(/{entityName}/g, entityName);
+
+  const output = JSON.stringify({
+    tool: 'flyToEntity',
+    arguments: {
+      entityId: entityName,
+      duration: 3,
+    },
+  });
+
+  return { instruction, output };
+}
+
 function generateZoomExample(): { instruction: string; output: string } {
   const zoomIn = Math.random() > 0.5;
   const templates = zoomIn ? ZOOM_IN_TEMPLATES : ZOOM_OUT_TEMPLATES;
@@ -668,22 +1271,186 @@ function generateCoordinateExample(): { instruction: string; output: string } {
 }
 
 // ============================================================================
+// Camera Control Generators
+// ============================================================================
+
+function generateSetViewExample(): { instruction: string; output: string } {
+  const location = randomChoice(LOCATIONS);
+  const template = randomChoice(SET_VIEW_TEMPLATES);
+  const nameOrAlias = Math.random() > 0.3 ? location.name : randomChoice([location.name, ...location.aliases]);
+
+  const instruction = template.replace('{location}', nameOrAlias);
+
+  // Generate random heading, pitch, roll for variety
+  const heading = Math.random() > 0.5 ? Math.round(Math.random() * 360) : undefined;
+  const pitch = Math.random() > 0.5 ? Math.round(-90 + Math.random() * 90) : undefined;
+
+  const args: Record<string, unknown> = {
+    longitude: location.longitude,
+    latitude: location.latitude,
+    height: location.height || 500000,
+  };
+
+  if (heading !== undefined) args.heading = heading;
+  if (pitch !== undefined) args.pitch = pitch;
+
+  const output = JSON.stringify({
+    tool: 'setView',
+    arguments: args,
+  });
+
+  return { instruction, output };
+}
+
+function generateGetCameraExample(): { instruction: string; output: string } {
+  const instruction = randomChoice(GET_CAMERA_TEMPLATES);
+
+  const output = JSON.stringify({
+    tool: 'getCamera',
+    arguments: {},
+  });
+
+  return { instruction, output };
+}
+
+function generateRotateCameraExample(): { instruction: string; output: string } {
+  const template = randomChoice(ROTATE_CAMERA_TEMPLATES);
+
+  // Determine rotation direction and axis from template
+  const isHorizontal = template.includes('left') || template.includes('right');
+  const isPositive = template.includes('right') || template.includes('up');
+
+  // Generate rotation amount in degrees
+  const amount = randomChoice([5, 10, 15, 30, 45, 90]);
+  const adjustedAmount = isPositive ? amount : -amount;
+
+  const args: Record<string, unknown> = {};
+  if (isHorizontal) {
+    args.heading = adjustedAmount;
+  } else {
+    args.pitch = adjustedAmount;
+  }
+
+  const output = JSON.stringify({
+    tool: 'rotateCamera',
+    arguments: args,
+  });
+
+  return { instruction: template, output };
+}
+
+function generateTrackEntityExample(): { instruction: string; output: string } {
+  const template = randomChoice(TRACK_ENTITY_TEMPLATES);
+  const entityType = randomChoice(ENTITY_TYPES);
+  const entityName = randomChoice(ENTITY_NAMES);
+
+  const instruction = template
+    .replace('{entityType}', entityType)
+    .replace('{entityName}', entityName);
+
+  // Use entity name if template used {entityName}, otherwise generate an ID based on type
+  const entityId = template.includes('{entityName}')
+    ? entityName
+    : `${entityType}-${Math.floor(Math.random() * 100)}`;
+
+  const output = JSON.stringify({
+    tool: 'trackEntity',
+    arguments: {
+      entityId,
+    },
+  });
+
+  return { instruction, output };
+}
+
+// ============================================================================
+// Data Loading Generators
+// ============================================================================
+
+function generateLoadGeoJSONExample(): { instruction: string; output: string } {
+  const template = randomChoice(LOAD_GEOJSON_TEMPLATES);
+  const url = randomChoice(SAMPLE_URLS.geojson);
+
+  const instruction = template.replace('{url}', url);
+
+  const output = JSON.stringify({
+    tool: 'loadGeoJSON',
+    arguments: {
+      url,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateLoadKMLExample(): { instruction: string; output: string } {
+  const template = randomChoice(LOAD_KML_TEMPLATES);
+  const url = randomChoice(SAMPLE_URLS.kml);
+
+  const instruction = template.replace('{url}', url);
+
+  const output = JSON.stringify({
+    tool: 'loadKML',
+    arguments: {
+      url,
+    },
+  });
+
+  return { instruction, output };
+}
+
+function generateLoadCZMLExample(): { instruction: string; output: string } {
+  const template = randomChoice(LOAD_CZML_TEMPLATES);
+  const url = randomChoice(SAMPLE_URLS.czml);
+
+  const instruction = template.replace('{url}', url);
+
+  const output = JSON.stringify({
+    tool: 'loadCZML',
+    arguments: {
+      url,
+    },
+  });
+
+  return { instruction, output };
+}
+
+// ============================================================================
 // Main Generator
 // ============================================================================
 
 function generateTrainingData(count: number): Array<{ instruction: string; output: string }> {
   const examples: Array<{ instruction: string; output: string }> = [];
   const generators = [
-    { fn: generateFlyToExample, weight: 25 },
-    { fn: generateAddPointExample, weight: 20 },
-    { fn: generateAddLabelExample, weight: 10 },
-    { fn: generateAddPolylineExample, weight: 10 },
-    { fn: generateAddPolygonExample, weight: 5 },
-    { fn: generateAddCircleExample, weight: 10 },
-    { fn: generateZoomExample, weight: 8 },
-    { fn: generateSceneModeExample, weight: 5 },
-    { fn: generateTimeExample, weight: 5 },
+    // Camera controls
+    { fn: generateFlyToExample, weight: 20 },
+    { fn: generateFlyToEntityExample, weight: 8 },
+    { fn: generateZoomExample, weight: 6 },
     { fn: generateCoordinateExample, weight: 2 },
+    { fn: generateSetViewExample, weight: 8 },
+    { fn: generateGetCameraExample, weight: 6 },
+    { fn: generateRotateCameraExample, weight: 6 },
+    { fn: generateTrackEntityExample, weight: 5 },
+    // 2D Entities
+    { fn: generateAddPointExample, weight: 12 },
+    { fn: generateAddLabelExample, weight: 6 },
+    { fn: generateAddPolylineExample, weight: 6 },
+    { fn: generateAddPolygonExample, weight: 4 },
+    { fn: generateAddCircleExample, weight: 6 },
+    // 3D Shapes - HIGH WEIGHT to train sphere vs circle distinction
+    { fn: generateAddSphereExample, weight: 15 },
+    { fn: generateAddBoxExample, weight: 4 },
+    { fn: generateAddCylinderExample, weight: 4 },
+    { fn: generateAddCorridorExample, weight: 3 },
+    { fn: generateAddWallExample, weight: 2 },
+    { fn: generateAddRectangleExample, weight: 3 },
+    // Scene
+    { fn: generateSceneModeExample, weight: 4 },
+    { fn: generateTimeExample, weight: 3 },
+    // Data Loading
+    { fn: generateLoadGeoJSONExample, weight: 4 },
+    { fn: generateLoadKMLExample, weight: 3 },
+    { fn: generateLoadCZMLExample, weight: 3 },
   ];
 
   const totalWeight = generators.reduce((sum, g) => sum + g.weight, 0);

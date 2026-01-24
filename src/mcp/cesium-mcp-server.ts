@@ -230,6 +230,23 @@ const tools = {
       id: z.string().describe('Entity ID to remove'),
     }),
   },
+  updateEntity: {
+    name: 'updateEntity',
+    description: 'Update properties of an existing entity',
+    inputSchema: z.object({
+      id: z.string().describe('ID of the entity to update'),
+      name: z.string().optional().describe('New name for the entity'),
+      description: z.string().optional().describe('New description for the entity'),
+    }),
+  },
+  cloneEntity: {
+    name: 'cloneEntity',
+    description: 'Clone an existing entity with a new name',
+    inputSchema: z.object({
+      entityId: z.string().describe('ID of the entity to clone'),
+      newName: z.string().describe('Name for the cloned entity'),
+    }),
+  },
   clearAll: {
     name: 'clearAll',
     description: 'Remove all entities from the scene',
@@ -833,6 +850,31 @@ const tools = {
       repeatY: z.number().positive().optional().describe('Vertical repeat count (default: 4)'),
     }),
   },
+  addPath: {
+    name: 'addPath',
+    description: 'Add a time-dynamic path visualization showing an entity moving along positions over time',
+    inputSchema: z.object({
+      positions: z.array(positionSchema).min(2).describe('Array of positions along the path'),
+      timestamps: z.array(z.string()).min(2).describe('ISO 8601 timestamps for each position'),
+      name: z.string().optional().describe('Name for the path'),
+      color: colorSchema.optional().describe('Path color'),
+      width: z.number().positive().optional().describe('Path width in pixels'),
+      leadTime: z.number().optional().describe('Lead time in seconds (how far ahead to show the path)'),
+      trailTime: z.number().optional().describe('Trail time in seconds (how far behind to show the path)'),
+    }),
+  },
+  addWMTS: {
+    name: 'addWMTS',
+    description: 'Add a WMTS (Web Map Tile Service) imagery layer',
+    inputSchema: z.object({
+      url: z.string().describe('WMTS service URL'),
+      layer: z.string().describe('WMTS layer identifier'),
+      name: z.string().optional().describe('Name for the layer'),
+      style: z.string().optional().describe('WMTS style name (default: "default")'),
+      format: z.string().optional().describe('Tile format (default: "image/jpeg")'),
+      tileMatrixSetID: z.string().optional().describe('Tile matrix set identifier'),
+    }),
+  },
 };
 
 type ToolName = keyof typeof tools;
@@ -1237,6 +1279,29 @@ export class CesiumMCPServer {
         const command: CesiumCommand = {
           type: 'entity.remove',
           id: args.id,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'updateEntity': {
+        const args = input as ToolInput<'updateEntity'>;
+        const command: CesiumCommand = {
+          type: 'entity.update',
+          id: args.id,
+          properties: {
+            name: args.name,
+            description: args.description,
+          },
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'cloneEntity': {
+        const args = input as ToolInput<'cloneEntity'>;
+        const command: CesiumCommand = {
+          type: 'entity.clone',
+          entityId: args.entityId,
+          newName: args.newName,
         };
         return this.commandHandler(command);
       }
@@ -2007,6 +2072,58 @@ export class CesiumMCPServer {
           oddColor: args.oddColor,
           repeatX: args.repeatX,
           repeatY: args.repeatY,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addPath': {
+        const args = input as ToolInput<'addPath'>;
+
+        if (args.positions.length !== args.timestamps.length) {
+          throw new Error('Positions and timestamps arrays must have the same length');
+        }
+
+        const pathEntity = czmlGenerator.createPath(
+          args.positions as CartographicPosition[],
+          args.timestamps,
+          {
+            name: args.name,
+            color: args.color,
+            width: args.width,
+            leadTime: args.leadTime,
+            trailTime: args.trailTime,
+            showPath: true,
+          }
+        );
+
+        const czml = czmlGenerator.buildCZMLDocument([pathEntity], {
+          name: args.name || 'Path',
+          startTime: args.timestamps[0],
+          stopTime: args.timestamps[args.timestamps.length - 1],
+        });
+
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity: pathEntity,
+        };
+
+        const result = await this.commandHandler(command);
+        return {
+          ...result,
+          data: { ...(result.data as object || {}), czml, entityId: pathEntity.id },
+        };
+      }
+
+      case 'addWMTS': {
+        const args = input as ToolInput<'addWMTS'>;
+        const command: CesiumCommand = {
+          type: 'imagery.addWMTS',
+          url: args.url,
+          layer: args.layer,
+          name: args.name,
+          style: args.style,
+          format: args.format,
+          tileMatrixSetID: args.tileMatrixSetID,
         };
         return this.commandHandler(command);
       }

@@ -449,14 +449,17 @@ export class CesiumCommandExecutor {
   }
 
   private async executeEntityUpdate(command: Extract<CesiumCommand, { type: 'entity.update' }>): Promise<{ success: boolean; message: string }> {
-    // Remove old entity and add updated one
-    this.executeEntityRemove({ type: 'entity.remove', id: command.id });
+    // Find and update the entity in place
+    const entity = this.findEntityByIdOrName(command.id);
+    if (!entity) {
+      return { success: false, message: `Entity '${command.id}' not found` };
+    }
 
-    const updatedEntity = { ...command.properties, id: command.id };
-    await this.executeEntityAdd({
-      type: 'entity.add',
-      entity: updatedEntity as Extract<CesiumCommand, { type: 'entity.add' }>['entity'],
-    });
+    // Apply property updates
+    const props = command.properties;
+    if (props.name !== undefined) {
+      entity.name = props.name;
+    }
 
     return { success: true, message: `Entity '${command.id}' updated` };
   }

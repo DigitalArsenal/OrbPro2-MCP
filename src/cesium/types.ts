@@ -122,6 +122,12 @@ export interface UpdateEntityCommand {
   properties: Partial<CZMLEntity>;
 }
 
+export interface CloneEntityCommand {
+  type: 'entity.clone';
+  entityId: string;
+  newName: string;
+}
+
 // Layer commands
 export interface AddImageryCommand {
   type: 'imagery.add';
@@ -311,6 +317,16 @@ export interface AddWMSCommand {
   url: string;
   layers: string;
   name?: string;
+}
+
+export interface AddWMTSCommand {
+  type: 'imagery.addWMTS';
+  url: string;
+  layer: string;
+  name?: string;
+  style?: string;
+  format?: string;
+  tileMatrixSetID?: string;
 }
 
 export interface SetLightingCommand {
@@ -522,6 +538,7 @@ export type CesiumCommand =
   | AddEntityCommand
   | RemoveEntityCommand
   | UpdateEntityCommand
+  | CloneEntityCommand
   | FlyToEntityCommand
   | ShowEntityCommand
   | HideEntityCommand
@@ -533,6 +550,7 @@ export type CesiumCommand =
   | SetImageryAlphaCommand
   | SetImageryBrightnessCommand
   | AddWMSCommand
+  | AddWMTSCommand
   | ToggleLayerCommand
   | SetTimeCommand
   | PlayTimeCommand
