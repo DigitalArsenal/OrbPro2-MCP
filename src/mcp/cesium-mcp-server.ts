@@ -106,6 +106,7 @@ const tools = {
     inputSchema: z.object({
       longitude: z.number().min(-180).max(180),
       latitude: z.number().min(-90).max(90),
+      height: z.number().optional().describe('Height above ground in meters'),
       radius: z.number().positive().describe('Sphere radius in meters'),
       name: z.string().optional(),
       color: colorSchema.optional(),
@@ -117,6 +118,7 @@ const tools = {
     inputSchema: z.object({
       longitude: z.number().min(-180).max(180),
       latitude: z.number().min(-90).max(90),
+      height: z.number().optional().describe('Height above ground in meters'),
       radiiX: z.number().positive().describe('Radius in X direction (meters)'),
       radiiY: z.number().positive().describe('Radius in Y direction (meters)'),
       radiiZ: z.number().positive().describe('Radius in Z direction (meters)'),
@@ -1114,7 +1116,7 @@ export class CesiumMCPServer {
       case 'addSphere': {
         const args = input as ToolInput<'addSphere'>;
         const entity = czmlGenerator.createSphere(
-          { longitude: args.longitude, latitude: args.latitude },
+          { longitude: args.longitude, latitude: args.latitude, height: args.height },
           args.radius,
           { name: args.name, color: args.color }
         );
@@ -1128,7 +1130,7 @@ export class CesiumMCPServer {
       case 'addEllipsoid': {
         const args = input as ToolInput<'addEllipsoid'>;
         const entity = czmlGenerator.createEllipsoid(
-          { longitude: args.longitude, latitude: args.latitude },
+          { longitude: args.longitude, latitude: args.latitude, height: args.height },
           { x: args.radiiX, y: args.radiiY, z: args.radiiZ },
           { name: args.name, color: args.color }
         );

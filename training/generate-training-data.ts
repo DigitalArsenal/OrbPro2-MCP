@@ -124,6 +124,29 @@ const LOCATIONS: Location[] = [
   { name: 'Tower of Pisa', aliases: ['Leaning Tower', 'Pisa Tower'], longitude: 10.3963, latitude: 43.7230, height: 20000, type: 'landmark' },
   { name: 'Stonehenge', aliases: ['the Stonehenge'], longitude: -1.8262, latitude: 51.1789, height: 30000, type: 'landmark' },
 
+  // Scientific Facilities & Research Centers
+  { name: 'CERN', aliases: ['the Large Hadron Collider', 'LHC', 'CERN Geneva'], longitude: 6.0536, latitude: 46.2330, height: 30000, type: 'landmark' },
+  { name: 'NASA Kennedy Space Center', aliases: ['Kennedy Space Center', 'KSC', 'Cape Canaveral'], longitude: -80.6501, latitude: 28.5729, height: 50000, type: 'landmark' },
+  { name: 'NASA JPL', aliases: ['Jet Propulsion Laboratory', 'JPL', 'JPL Pasadena'], longitude: -118.1726, latitude: 34.2013, height: 30000, type: 'landmark' },
+  { name: 'NASA Houston', aliases: ['Johnson Space Center', 'JSC', 'Mission Control'], longitude: -95.0930, latitude: 29.5519, height: 30000, type: 'landmark' },
+  { name: 'Baikonur Cosmodrome', aliases: ['Baikonur', 'Baikonur Kazakhstan'], longitude: 63.3420, latitude: 45.9646, height: 50000, type: 'landmark' },
+  { name: 'Vandenberg Space Force Base', aliases: ['Vandenberg', 'VSFB', 'Vandenberg AFB'], longitude: -120.5724, latitude: 34.7420, height: 50000, type: 'landmark' },
+  { name: 'European Space Agency', aliases: ['ESA', 'ESOC Darmstadt', 'ESA Headquarters'], longitude: 8.6220, latitude: 49.8700, height: 30000, type: 'landmark' },
+  { name: 'Goddard Space Flight Center', aliases: ['Goddard', 'GSFC'], longitude: -76.8527, latitude: 38.9910, height: 30000, type: 'landmark' },
+  { name: 'SpaceX Starbase', aliases: ['Starbase', 'Boca Chica', 'SpaceX Texas'], longitude: -97.1557, latitude: 25.9968, height: 30000, type: 'landmark' },
+  { name: 'MIT', aliases: ['Massachusetts Institute of Technology', 'MIT Cambridge'], longitude: -71.0921, latitude: 42.3601, height: 30000, type: 'landmark' },
+  { name: 'Stanford', aliases: ['Stanford University', 'Stanford Palo Alto'], longitude: -122.1697, latitude: 37.4275, height: 30000, type: 'landmark' },
+  { name: 'Pentagon', aliases: ['the Pentagon', 'DoD Headquarters'], longitude: -77.0558, latitude: 38.8719, height: 30000, type: 'landmark' },
+  { name: 'White House', aliases: ['the White House', 'US White House'], longitude: -77.0365, latitude: 38.8977, height: 30000, type: 'landmark' },
+  { name: 'Fermilab', aliases: ['Fermi National Accelerator Laboratory'], longitude: -88.2575, latitude: 41.8319, height: 30000, type: 'landmark' },
+  { name: 'Area 51', aliases: ['Groom Lake', 'Nevada Test Site'], longitude: -115.8111, latitude: 37.2350, height: 50000, type: 'landmark' },
+
+  // Airports
+  { name: 'JFK Airport', aliases: ['JFK', 'John F Kennedy Airport', 'New York JFK'], longitude: -73.7781, latitude: 40.6413, height: 20000, type: 'landmark' },
+  { name: 'Heathrow Airport', aliases: ['Heathrow', 'London Heathrow', 'LHR'], longitude: -0.4543, latitude: 51.4700, height: 20000, type: 'landmark' },
+  { name: 'LAX', aliases: ['Los Angeles Airport', 'LAX Airport'], longitude: -118.4085, latitude: 33.9416, height: 20000, type: 'landmark' },
+  { name: 'Dubai Airport', aliases: ['DXB', 'Dubai International'], longitude: 55.3647, latitude: 25.2532, height: 20000, type: 'landmark' },
+
   // Natural Wonders
   { name: 'Grand Canyon', aliases: ['the Grand Canyon'], longitude: -112.1401, latitude: 36.0544, height: 100000, type: 'natural' },
   { name: 'Mount Everest', aliases: ['Everest', 'Mt. Everest', 'Mt Everest'], longitude: 86.9250, latitude: 27.9881, height: 100000, type: 'natural' },

@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     python3 python3-pip python3-venv \
     git git-lfs cmake ninja-build \
-    curl wget nodejs npm \
+    curl wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Emscripten (cached in Docker layer)
@@ -16,6 +16,15 @@ RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk && \
     cd /opt/emsdk && \
     ./emsdk install latest && \
     ./emsdk activate latest
+
+# Set up Emscripten environment permanently
+ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:/opt/emsdk/node/18.20.3_64bit/bin:${PATH}"
+ENV EMSDK="/opt/emsdk"
+ENV EMSDK_NODE="/opt/emsdk/node/18.20.3_64bit/bin/node"
+ENV EM_CONFIG="/root/.emscripten"
+
+# Create emscripten config
+RUN /opt/emsdk/emsdk construct_env
 
 # Install MLC-LLM nightly wheels for CPU (x86_64)
 RUN pip3 install --upgrade pip && \
@@ -25,19 +34,27 @@ RUN pip3 install --upgrade pip && \
 # Install other dependencies
 RUN pip3 install transformers safetensors sentencepiece huggingface_hub
 
-# Set up environment
-ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
-ENV EMSDK="/opt/emsdk"
+# Clone MLC-LLM source (cached in Docker layer)
+RUN git clone --recursive https://github.com/mlc-ai/mlc-llm.git /opt/mlc-llm
 
-# Clone MLC-LLM source and build WASM runtime (cached in Docker layer)
-RUN git clone --recursive https://github.com/mlc-ai/mlc-llm.git /opt/mlc-llm && \
-    cd /opt/mlc-llm && \
+# Build WASM runtime - this is the critical step
+# Must source emsdk_env.sh to get emcc in PATH
+RUN cd /opt/mlc-llm && \
     . /opt/emsdk/emsdk_env.sh && \
-    ./web/prep_emcc_deps.sh
+    ./web/prep_emcc_deps.sh && \
+    ls -la /opt/mlc-llm/web/dist/wasm/
 
+# Set MLC_LLM_SOURCE_DIR so compile can find mlc_wasm_runtime.bc
 ENV MLC_LLM_SOURCE_DIR="/opt/mlc-llm"
+
+# Verify the WASM runtime exists
+RUN test -f /opt/mlc-llm/web/dist/wasm/mlc_wasm_runtime.bc || \
+    (echo "ERROR: mlc_wasm_runtime.bc not found!" && exit 1)
 
 # Create cache directories for mounted volumes
 RUN mkdir -p /root/.cache/huggingface /root/.cache/pip
 
 WORKDIR /workspace
+
+# Default command shows environment info
+CMD ["bash", "-c", "echo MLC_LLM_SOURCE_DIR=$MLC_LLM_SOURCE_DIR && ls -la $MLC_LLM_SOURCE_DIR/web/dist/wasm/"]

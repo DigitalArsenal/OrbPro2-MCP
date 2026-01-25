@@ -81,12 +81,23 @@ docker run --rm --platform linux/amd64 \
     mlc-cesium-compile \
     /bin/bash -c "
         set -e
+
+        # Source emscripten environment
+        . /opt/emsdk/emsdk_env.sh
+
+        # Verify MLC_LLM_SOURCE_DIR is set and wasm runtime exists
+        echo '=== Environment check ==='
+        echo \"MLC_LLM_SOURCE_DIR=\$MLC_LLM_SOURCE_DIR\"
+        ls -la \$MLC_LLM_SOURCE_DIR/web/dist/wasm/mlc_wasm_runtime.bc
+
         cd /workspace/output
 
+        echo ''
         echo '=== Copying model files (MLC needs write access) ==='
         mkdir -p /workspace/model
         cp -r /workspace/model_ro/* /workspace/model/
 
+        echo ''
         echo '=== Converting weights to MLC format ==='
         python3 -m mlc_llm convert_weight \
             /workspace/model \
