@@ -47,9 +47,13 @@ export interface ToolCall {
 
 // Recommended models for CesiumJS control tasks
 export const RECOMMENDED_MODELS = {
+  // Our fine-tuned Cesium model - trained on 11K+ Cesium command examples
+  // Uses Qwen2.5-0.5B as base (same architecture, optimized for Cesium tool calls)
+  trained: [
+    'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', // Base model - LoRA adapter available locally
+  ],
   // Smaller, faster models - optimized for function calling
   small: [
-    'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
     'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
     'SmolLM2-360M-Instruct-q4f16_1-MLC',
     'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
@@ -80,17 +84,30 @@ export interface CustomModelConfig {
   tokenizerFiles?: string[];
 }
 
-// Registry for custom models (populate after compiling with scripts/compile-functiongemma.sh)
+// Registry for custom models (populate after compiling with scripts/compile-cesium-slm.sh)
 export const CUSTOM_MODEL_REGISTRY: Record<string, CustomModelConfig> = {
-  // Example: Add your compiled FunctionGemma here after hosting
-  // 'FunctionGemma-270M-it-q4f16_1-MLC': {
-  //   modelId: 'FunctionGemma-270M-it-q4f16_1-MLC',
-  //   modelLibUrl: 'https://huggingface.co/YOUR_USERNAME/FunctionGemma-270M-it-q4f16_1-MLC/resolve/main/FunctionGemma-270M-it-q4f16_1-MLC.wasm',
-  //   modelWeightsUrl: 'https://huggingface.co/YOUR_USERNAME/FunctionGemma-270M-it-q4f16_1-MLC',
+  // OrbPro Cesium SLM - Fine-tuned on 11K+ Cesium commands
+  // Uncomment and update with your HuggingFace username after uploading:
+  //
+  // 'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC': {
+  //   modelId: 'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC',
+  //   modelLibUrl: 'https://huggingface.co/YOUR_USERNAME/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC.wasm',
+  //   modelWeightsUrl: 'https://huggingface.co/YOUR_USERNAME/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC',
   //   vramRequired: 512,
   //   contextWindowSize: 4096,
   // },
 };
+
+// Check if custom model is available and should be used
+export function isCustomModelAvailable(): boolean {
+  return Object.keys(CUSTOM_MODEL_REGISTRY).length > 0;
+}
+
+// Get the primary custom model ID (the trained Cesium SLM)
+export function getCustomModelId(): string | null {
+  const customModels = Object.keys(CUSTOM_MODEL_REGISTRY);
+  return customModels.length > 0 ? customModels[0]! : null;
+}
 
 export class WebLLMEngine {
   private engine: MLCEngine | null = null;
@@ -117,26 +134,60 @@ export class WebLLMEngine {
     // Dynamic import to support tree-shaking and lazy loading
     const webllm = await import('@mlc-ai/web-llm');
 
+    // Check if this is a custom model from our registry
+    const customConfig = CUSTOM_MODEL_REGISTRY[this.config.modelId];
+
     // Models are automatically cached in browser's Cache API by web-llm
     // Once downloaded, they persist across page reloads
-    this.engine = await webllm.CreateMLCEngine(
-      this.config.modelId,
-      {
-        initProgressCallback: (report) => {
-          if (this.config.onProgress) {
-            this.config.onProgress({
-              progress: report.progress,
-              timeElapsed: report.timeElapsed,
-              text: report.text,
-            });
-          }
+    if (customConfig) {
+      // Load custom model with explicit URLs
+      this.engine = await webllm.CreateMLCEngine(
+        this.config.modelId,
+        {
+          initProgressCallback: (report) => {
+            if (this.config.onProgress) {
+              this.config.onProgress({
+                progress: report.progress,
+                timeElapsed: report.timeElapsed,
+                text: report.text,
+              });
+            }
+          },
+          appConfig: {
+            model_list: [{
+              model: customConfig.modelWeightsUrl,
+              model_id: customConfig.modelId,
+              model_lib: customConfig.modelLibUrl,
+              vram_required_MB: customConfig.vramRequired,
+              low_resource_required: true,
+            }],
+          },
         },
-      },
-      {
-        // Override default context window to support longer prompts
-        context_window_size: this.config.contextWindowSize,
-      }
-    );
+        {
+          context_window_size: customConfig.contextWindowSize,
+        }
+      );
+    } else {
+      // Load standard WebLLM model
+      this.engine = await webllm.CreateMLCEngine(
+        this.config.modelId,
+        {
+          initProgressCallback: (report) => {
+            if (this.config.onProgress) {
+              this.config.onProgress({
+                progress: report.progress,
+                timeElapsed: report.timeElapsed,
+                text: report.text,
+              });
+            }
+          },
+        },
+        {
+          // Override default context window to support longer prompts
+          context_window_size: this.config.contextWindowSize,
+        }
+      );
+    }
 
     this.isInitialized = true;
   }

@@ -39,6 +39,10 @@ training/generated-training-data.jsonl
 training/finetune/output/
 training/*.bin
 training/*.safetensors
+training/cesium-qwen-lora/
 
-# MLC compiled models (11GB+, download or compile separately)
+# MLC compiled models (download or compile separately)
 mlc-models/
+
+# Build cache (Docker compilation caches, HuggingFace downloads)
+.cache/

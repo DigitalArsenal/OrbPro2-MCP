@@ -1,0 +1,43 @@
+# MLC-LLM Compilation Environment for OrbPro Cesium SLM
+# This Dockerfile is static - don't regenerate it to preserve layer caching
+FROM --platform=linux/amd64 ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv \
+    git git-lfs cmake ninja-build \
+    curl wget nodejs npm \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Emscripten (cached in Docker layer)
+RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk && \
+    cd /opt/emsdk && \
+    ./emsdk install latest && \
+    ./emsdk activate latest
+
+# Install MLC-LLM nightly wheels for CPU (x86_64)
+RUN pip3 install --upgrade pip && \
+    pip3 install --pre -U -f https://mlc.ai/wheels mlc-llm-nightly-cpu mlc-ai-nightly-cpu && \
+    python3 -c "import mlc_llm; print('MLC-LLM installed successfully')"
+
+# Install other dependencies
+RUN pip3 install transformers safetensors sentencepiece huggingface_hub
+
+# Set up environment
+ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
+ENV EMSDK="/opt/emsdk"
+
+# Clone MLC-LLM source and build WASM runtime (cached in Docker layer)
+RUN git clone --recursive https://github.com/mlc-ai/mlc-llm.git /opt/mlc-llm && \
+    cd /opt/mlc-llm && \
+    . /opt/emsdk/emsdk_env.sh && \
+    ./web/prep_emcc_deps.sh
+
+ENV MLC_LLM_SOURCE_DIR="/opt/mlc-llm"
+
+# Create cache directories for mounted volumes
+RUN mkdir -p /root/.cache/huggingface /root/.cache/pip
+
+WORKDIR /workspace

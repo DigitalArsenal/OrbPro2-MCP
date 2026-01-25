@@ -24,7 +24,8 @@ export class ModelSelector {
 
     this.container = container;
     this.onSelect = config.onSelect;
-    this.selectedModel = config.defaultModel || RECOMMENDED_MODELS.small[0]!;
+    // Default to the trained model (recommended for Cesium)
+    this.selectedModel = config.defaultModel || RECOMMENDED_MODELS.trained[0]!;
 
     this.injectStyles();
     this.render();
@@ -38,6 +39,14 @@ export class ModelSelector {
 
         <div class="model-categories-scroll">
           <div class="model-categories">
+            <div class="model-category model-category-recommended">
+              <h4><span class="recommended-badge">RECOMMENDED</span> Cesium-Trained Model</h4>
+              <p class="category-desc">Fine-tuned on 11,000+ Cesium commands for best performance</p>
+              <div class="model-list">
+                ${RECOMMENDED_MODELS.trained.map(model => this.renderModelOption(model, 'trained')).join('')}
+              </div>
+            </div>
+
             <div class="model-category">
               <h4>Small (Fast, ~500MB-2GB)</h4>
               <div class="model-list">
@@ -74,11 +83,12 @@ export class ModelSelector {
 
   private renderModelOption(modelId: string, tier: string): string {
     const isSelected = modelId === this.selectedModel;
-    const displayName = this.getDisplayName(modelId);
+    const displayName = this.getDisplayName(modelId, tier);
     const description = this.getModelDescription(modelId, tier);
+    const isTrained = tier === 'trained';
 
     return `
-      <label class="model-option ${isSelected ? 'selected' : ''}">
+      <label class="model-option ${isSelected ? 'selected' : ''} ${isTrained ? 'model-option-trained' : ''}">
         <input type="radio" name="model" value="${modelId}" ${isSelected ? 'checked' : ''}>
         <div class="model-option-content">
           <span class="model-name">${displayName}</span>
@@ -88,7 +98,12 @@ export class ModelSelector {
     `;
   }
 
-  private getDisplayName(modelId: string): string {
+  private getDisplayName(modelId: string, tier?: string): string {
+    // Special name for the trained model
+    if (tier === 'trained') {
+      return 'OrbPro Cesium SLM (0.5B)';
+    }
+
     // Extract readable name from model ID
     return modelId
       .replace(/-q\d+f\d+_\d+-MLC$/, '')
@@ -97,6 +112,11 @@ export class ModelSelector {
   }
 
   private getModelDescription(modelId: string, tier: string): string {
+    // Special description for trained model
+    if (tier === 'trained') {
+      return 'Optimized for Cesium globe control - fastest & most accurate';
+    }
+
     const descriptions: Record<string, string> = {
       'Qwen2.5-0.5B-Instruct-q4f16_1-MLC': 'Tiny but efficient, great for basic commands',
       'Qwen2.5-1.5B-Instruct-q4f16_1-MLC': 'Good balance of speed and capability',
@@ -204,6 +224,59 @@ export class ModelSelector {
         font-size: 0.9em;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+      }
+
+      .model-category-recommended {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.05));
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 8px;
+      }
+
+      .model-category-recommended h4 {
+        color: #22c55e;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .recommended-badge {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        font-size: 0.65em;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      .category-desc {
+        margin: 0 0 10px 0;
+        color: #9ca3af;
+        font-size: 0.8em;
+      }
+
+      .model-option-trained {
+        border: 2px solid rgba(34, 197, 94, 0.4) !important;
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)) !important;
+      }
+
+      .model-option-trained:hover {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.1)) !important;
+      }
+
+      .model-option-trained.selected {
+        border-color: #22c55e !important;
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+      }
+
+      .model-option-trained .model-name {
+        color: #22c55e;
+      }
+
+      .model-option-trained input {
+        accent-color: #22c55e;
       }
 
       .model-list {

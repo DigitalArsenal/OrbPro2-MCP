@@ -222,6 +222,8 @@ export class CesiumCommandExecutor {
           return this.executeEntityRemove(command);
         case 'entity.update':
           return await this.executeEntityUpdate(command);
+        case 'entity.clone':
+          return await this.executeEntityClone(command);
         case 'entity.flyTo':
           return await this.executeFlyToEntity(command);
         case 'entity.show':
@@ -450,18 +452,85 @@ export class CesiumCommandExecutor {
 
   private async executeEntityUpdate(command: Extract<CesiumCommand, { type: 'entity.update' }>): Promise<{ success: boolean; message: string }> {
     // Find and update the entity in place
-    const entity = this.findEntityByIdOrName(command.id);
+    const entity = this.findEntityByIdOrName(command.id) as { name?: string; description?: string; show?: boolean } | undefined;
     if (!entity) {
       return { success: false, message: `Entity '${command.id}' not found` };
     }
 
     // Apply property updates
-    const props = command.properties;
+    const props = command.properties as Record<string, unknown>;
     if (props.name !== undefined) {
-      entity.name = props.name;
+      entity.name = props.name as string;
+    }
+    if (props.description !== undefined) {
+      entity.description = props.description as string;
+    }
+    if (props.show !== undefined) {
+      entity.show = props.show as boolean;
     }
 
     return { success: true, message: `Entity '${command.id}' updated` };
+  }
+
+  private async executeEntityClone(command: Extract<CesiumCommand, { type: 'entity.clone' }>): Promise<{ success: boolean; message: string }> {
+    // Find the source entity
+    const sourceEntity = this.findEntityByIdOrName(command.entityId);
+    if (!sourceEntity) {
+      return { success: false, message: `Source entity '${command.entityId}' not found` };
+    }
+
+    // Cast sourceEntity to access Cesium entity properties
+    const src = sourceEntity as {
+      position?: { getValue: (time: unknown) => unknown };
+      orientation?: { getValue: (time: unknown) => unknown };
+      point?: { pixelSize?: { getValue: (time: unknown) => unknown }; color?: { getValue: (time: unknown) => unknown }; outlineColor?: { getValue: (time: unknown) => unknown }; outlineWidth?: { getValue: (time: unknown) => unknown } };
+      billboard?: { image?: { getValue: (time: unknown) => unknown }; scale?: { getValue: (time: unknown) => unknown } };
+      label?: { text?: { getValue: (time: unknown) => unknown }; font?: { getValue: (time: unknown) => unknown }; fillColor?: { getValue: (time: unknown) => unknown } };
+      polyline?: { positions?: { getValue: (time: unknown) => unknown }; width?: { getValue: (time: unknown) => unknown }; material?: { getValue: (time: unknown) => unknown } };
+      polygon?: { hierarchy?: { getValue: (time: unknown) => unknown }; material?: { getValue: (time: unknown) => unknown }; extrudedHeight?: { getValue: (time: unknown) => unknown } };
+      ellipse?: { semiMajorAxis?: { getValue: (time: unknown) => unknown }; semiMinorAxis?: { getValue: (time: unknown) => unknown }; material?: { getValue: (time: unknown) => unknown } };
+    };
+
+    // Create a new entity with the source entity's properties and a new name
+    const newId = `${command.newName}_${Date.now()}`;
+    this.viewer.entities.add({
+      id: newId,
+      name: command.newName,
+      position: src.position?.getValue(Cesium.JulianDate.now()),
+      orientation: src.orientation?.getValue(Cesium.JulianDate.now()),
+      point: src.point ? {
+        pixelSize: src.point.pixelSize?.getValue(Cesium.JulianDate.now()),
+        color: src.point.color?.getValue(Cesium.JulianDate.now()),
+        outlineColor: src.point.outlineColor?.getValue(Cesium.JulianDate.now()),
+        outlineWidth: src.point.outlineWidth?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+      billboard: src.billboard ? {
+        image: src.billboard.image?.getValue(Cesium.JulianDate.now()),
+        scale: src.billboard.scale?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+      label: src.label ? {
+        text: src.label.text?.getValue(Cesium.JulianDate.now()),
+        font: src.label.font?.getValue(Cesium.JulianDate.now()),
+        fillColor: src.label.fillColor?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+      polyline: src.polyline ? {
+        positions: src.polyline.positions?.getValue(Cesium.JulianDate.now()),
+        width: src.polyline.width?.getValue(Cesium.JulianDate.now()),
+        material: src.polyline.material?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+      polygon: src.polygon ? {
+        hierarchy: src.polygon.hierarchy?.getValue(Cesium.JulianDate.now()),
+        material: src.polygon.material?.getValue(Cesium.JulianDate.now()),
+        extrudedHeight: src.polygon.extrudedHeight?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+      ellipse: src.ellipse ? {
+        semiMajorAxis: src.ellipse.semiMajorAxis?.getValue(Cesium.JulianDate.now()),
+        semiMinorAxis: src.ellipse.semiMinorAxis?.getValue(Cesium.JulianDate.now()),
+        material: src.ellipse.material?.getValue(Cesium.JulianDate.now()),
+      } : undefined,
+    });
+
+    return { success: true, message: `Entity cloned as '${command.newName}' with ID '${newId}'` };
   }
 
   private async executeFlyToEntity(command: Extract<CesiumCommand, { type: 'entity.flyTo' }>): Promise<{ success: boolean; message: string }> {
