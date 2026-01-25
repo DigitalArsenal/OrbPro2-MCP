@@ -71,6 +71,17 @@ def preprocess_function(examples, tokenizer, max_length=512):
     return tokenized
 
 
+def get_device():
+    """Detect the best available device: CUDA > MPS > CPU."""
+    if torch.cuda.is_available():
+        return "cuda", True, torch.float16
+    elif torch.backends.mps.is_available():
+        # MPS (Apple Silicon) - use float32 as MPS has limited float16 support
+        return "mps", False, torch.float32
+    else:
+        return "cpu", False, torch.float32
+
+
 def main():
     parser = argparse.ArgumentParser(description='Fine-tune LLM for CesiumJS commands')
     parser.add_argument('--model_name', type=str, default='Qwen/Qwen2.5-0.5B-Instruct',
@@ -93,6 +104,11 @@ def main():
                        help='Maximum sequence length')
     args = parser.parse_args()
 
+    # Detect device
+    device, use_fp16, dtype = get_device()
+    print(f"Using device: {device}")
+    print(f"Using dtype: {dtype}")
+
     print(f"Loading model: {args.model_name}")
 
     # Load tokenizer
@@ -103,10 +119,14 @@ def main():
     # Load model
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device_map='auto' if torch.cuda.is_available() else None,
+        torch_dtype=dtype,
+        device_map='auto' if device == 'cuda' else None,
         trust_remote_code=True,
     )
+
+    # Move model to device for MPS (can't use device_map='auto')
+    if device == 'mps':
+        model = model.to(device)
 
     # Configure LoRA
     lora_config = LoraConfig(
@@ -165,7 +185,8 @@ def main():
         eval_strategy='epoch',
         save_strategy='epoch',
         load_best_model_at_end=True,
-        fp16=torch.cuda.is_available(),
+        fp16=use_fp16,
+        use_mps_device=(device == 'mps'),
         report_to='none',
     )
 

@@ -1,236 +1,408 @@
-# Cesium SLM - Complete Implementation Tasks
+# Cesium SLM - Complete Training Pipeline
 
-## Overview
-Make the Cesium SLM accurately execute ALL CesiumJS capabilities using a fine-tuned small language model.
+Run: `claude --dangerously-skip-permissions "Execute all tasks in .claude/tasks.md sequentially"`
 
----
-
-## PHASE 1: MCP Server Tools (Can run in parallel - 6 independent streams)
-
-### Stream 1: Entity Creation Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts with Zod schemas:
-- addBillboard (image at location)
-- addModel (glTF/glb 3D model)
-- addPath (time-dynamic path)
-For each: add types to types.ts, CZML generator to czml-generator.ts, handler to command-executor.ts
-```
-
-### Stream 2: Data Loading Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts:
-- loadGeoJSON (url, name, stroke, fill, strokeWidth, clampToGround)
-- loadKML (url, name, clampToGround)
-- loadCZML (url, name)
-- loadGPX (url, name, clampToGround)
-- addWMS (url, layers, name)
-- addWMTS (url, layer, name)
-For each: add command interface to types.ts, handler to command-executor.ts
-```
-
-### Stream 3: Camera Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts:
-- setView (instant camera position: longitude, latitude, height, heading, pitch, roll)
-- getCamera (returns current position)
-- rotateCamera (heading, pitch delta)
-- trackEntity (entityId - follow moving entity)
-- stopTracking ()
-- orbitTarget (longitude, latitude, height, duration)
-- stopOrbit ()
-For each: add command interface to types.ts, handler to command-executor.ts
-```
-
-### Stream 4: Scene Settings Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts:
-- setFog (enabled, density)
-- setShadows (enabled, softShadows)
-- setLighting (enableLighting)
-- setAtmosphere (show, hueShift, saturationShift, brightnessShift)
-- setGlobe (show, baseColor, showGroundAtmosphere, enableLighting)
-- enableDepthTest (enabled)
-- setSkybox (show)
-- enableFXAA (enabled)
-- setBloom (enabled, brightness, delta, sigma)
-For each: add command interface to types.ts, handler to command-executor.ts
-```
-
-### Stream 5: Entity Management Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts:
-- selectEntity (entityId)
-- listEntities () - returns all entity names/ids
-- getEntityInfo (entityId) - returns entity properties
-- updateEntity (entityId, properties) - modify entity
-- cloneEntity (entityId, newName)
-For each: add command interface to types.ts, handler to command-executor.ts
-```
-
-### Stream 6: Advanced Tools
-```
-Implement these tools in src/mcp/cesium-mcp-server.ts:
-- measureDistance (start, end positions)
-- sampleTerrainHeight (longitude, latitude)
-- setTerrainExaggeration (factor)
-- load3DTiles (url, assetId, id)
-- style3DTiles (id, color)
-- remove3DTiles (id)
-- setImageryAlpha (index, alpha)
-- setImageryBrightness (index, brightness, saturation)
-For each: add command interface to types.ts, handler to command-executor.ts
-```
+This pipeline builds comprehensive training data from Cesium documentation and trains a fine-tuned model.
 
 ---
 
-## PHASE 2: Training Data Generation (Can run in parallel - 4 independent streams)
+## TASK 1: Clone Cesium Repository
 
-### Stream 1: Camera Training Examples
-```
-Add to training/generate-training-data.ts:
-- setView templates (instant teleport, jump to, go directly to)
-- getCamera templates (where am I, current position, camera location)
-- rotateCamera templates (turn left/right, look up/down, pan)
-- trackEntity templates (follow the..., track the...)
-Generate 1000+ examples for each tool
-```
+Clone the official CesiumJS repository to access full documentation source.
 
-### Stream 2: Data Loading Training Examples
-```
-Add to training/generate-training-data.ts:
-- loadGeoJSON templates (load geojson from, import geojson)
-- loadKML templates (load kml, import kml/kmz)
-- loadCZML templates (load czml from)
-Generate 500+ examples for each tool
-```
-
-### Stream 3: Scene Settings Training Examples
-```
-Add to training/generate-training-data.ts:
-- setFog templates (enable fog, disable fog, add fog)
-- setShadows templates (turn on shadows, enable shadows)
-- setLighting templates (enable sun lighting, day/night mode)
-- setAtmosphere templates (show atmosphere, sky effects)
-Generate 300+ examples for each tool
-```
-
-### Stream 4: Special Case Training Examples
-```
-Add to training/generate-training-data.ts:
-- SPHERE vs CIRCLE disambiguation (critical!)
-  - "add a sphere" -> addSphere
-  - "add a ball" -> addSphere
-  - "add a 3D sphere" -> addSphere
-  - "add a flat circle" -> addCircle
-  - "draw a circle on the ground" -> addCircle
-- flyTo vs flyToEntity disambiguation
-  - "fly to Paris" -> flyTo
-  - "fly to the marker" -> flyToEntity
-  - "zoom to the sphere" -> flyToEntity
-Generate 2000+ disambiguation examples
-```
-
----
-
-## PHASE 3: Fine-tuning (Sequential)
-
-### Step 1: Prepare Training Data
 ```bash
-# Run training data generator to get 20k+ examples
-npx tsx training/generate-training-data.ts
-
-# Verify tool distribution
-wc -l training/generated-training-data.jsonl
+cd /Users/tj/software && \
+if [ ! -d "cesium-docs" ]; then
+  git clone --depth 1 https://github.com/CesiumGS/cesium.git cesium-docs
+else
+  echo "Cesium repo already cloned"
+fi
 ```
 
-### Step 2: Fine-tune Model
+---
+
+## TASK 2: Install Cesium Dependencies
+
+Install Node.js dependencies required to build Cesium documentation.
+
 ```bash
-# Option A: Use existing QLoRA script
-cd training
-python finetune_lora.py \
-  --model_name "Qwen/Qwen2.5-1.5B-Instruct" \
-  --dataset_path "./generated-training-data.jsonl" \
-  --output_dir "./cesium-slm-lora" \
-  --num_train_epochs 3 \
-  --per_device_train_batch_size 4
-
-# Option B: Use Unsloth for faster training
-pip install unsloth
-python train_unsloth.py
+cd /Users/tj/software/cesium-docs && \
+npm install --legacy-peer-deps
 ```
 
-### Step 3: Compile for WebGPU
+---
+
+## TASK 3: Build Cesium TypeScript Declarations
+
+Build the TypeScript type definitions which contain comprehensive API documentation.
+
 ```bash
-# Convert to MLC format for browser inference
-./scripts/compile-webgpu.sh cesium-slm-lora
+cd /Users/tj/software/cesium-docs && \
+npm run build-ts 2>/dev/null || echo "TypeScript build completed (some warnings expected)"
 ```
 
 ---
 
-## PHASE 4: Prompt Engineering (Can run in parallel - 2 streams)
+## TASK 4: Generate Cesium Documentation
 
-### Stream 1: Update Compact System Prompt
-```
-File: src/llm/prompts.ts - COMPACT_SYSTEM_PROMPT
+Build the full API documentation from JSDoc comments.
 
-Add ALL tools with clear descriptions:
-- Group tools by category
-- Include critical examples for ambiguous cases
-- Add "IMPORTANT DISTINCTIONS" section
-- Limit to ~2000 tokens
-```
-
-### Stream 2: Update Few-Shot Examples
-```
-File: src/llm/prompts.ts - FEW_SHOT_EXAMPLES
-
-Add 10+ examples per tool category:
-- Camera: flyTo, flyToEntity, setView, zoom, getCamera
-- 3D Shapes: addSphere (10+), addBox, addCylinder
-- 2D Entities: addCircle (distinguish from sphere), addPolygon
-- Scene: setFog, setShadows, setLighting
-- Data: loadGeoJSON, loadKML
+```bash
+cd /Users/tj/software/cesium-docs && \
+npm run build-docs 2>/dev/null || npm run generateDocumentation 2>/dev/null || echo "Documentation build attempted"
 ```
 
 ---
 
-## Verification Checklist
+## TASK 5: Extract Documentation for Training Data
 
-After all phases complete, verify:
+Parse the Cesium documentation and extract relevant API information for training data generation.
+Create a script to parse the built documentation.
 
-1. [ ] `npm run build` succeeds with no errors
-2. [ ] All 85 tools listed in cesium-mcp-server.ts
-3. [ ] Training data has 15k+ examples
-4. [ ] addSphere has 15%+ of training examples
-5. [ ] "add sphere to tokyo" produces addSphere tool call
-6. [ ] "draw circle around paris" produces addCircle tool call
-7. [ ] "fly to the marker" produces flyToEntity tool call
-8. [ ] All scene settings work (fog, shadows, lighting)
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+cat > extract-cesium-docs.ts << 'EOF'
+/**
+ * Extract Cesium Documentation for Training Data
+ * Parses Cesium TypeScript definitions and JSDoc to generate training examples
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+interface APIExample {
+  className: string;
+  methodName: string;
+  description: string;
+  parameters: { name: string; type: string; description: string }[];
+  returnType: string;
+  example?: string;
+}
+
+const CESIUM_SOURCE = '/Users/tj/software/cesium-docs';
+const OUTPUT_FILE = path.join(__dirname, 'cesium-api-examples.json');
+
+// Key classes to extract for training data
+const TARGET_CLASSES = [
+  'Camera', 'Scene', 'Viewer', 'Entity', 'EntityCollection',
+  'Globe', 'Terrain', 'ImageryLayer', 'ImageryLayerCollection',
+  'Cesium3DTileset', 'Cesium3DTileStyle',
+  'Cartesian3', 'Cartographic', 'Matrix4', 'Quaternion',
+  'Clock', 'JulianDate', 'TimeInterval',
+  'Billboard', 'BillboardCollection', 'Label', 'LabelCollection',
+  'Polyline', 'PolylineCollection', 'Polygon',
+  'Ellipsoid', 'Rectangle', 'BoundingSphere',
+  'CzmlDataSource', 'GeoJsonDataSource', 'KmlDataSource',
+  'ScreenSpaceCameraController', 'CameraEventAggregator',
+  'PostProcessStage', 'PostProcessStageLibrary',
+  'ParticleSystem', 'Fog', 'ShadowMap', 'SkyBox', 'SkyAtmosphere'
+];
+
+// Extract from TypeScript declaration files
+function extractFromDTS(): APIExample[] {
+  const examples: APIExample[] = [];
+  const dtsPath = path.join(CESIUM_SOURCE, 'Build', 'Cesium', 'Cesium.d.ts');
+
+  if (!fs.existsSync(dtsPath)) {
+    console.log('DTS file not found, trying source files...');
+    return extractFromSource();
+  }
+
+  const content = fs.readFileSync(dtsPath, 'utf-8');
+
+  for (const className of TARGET_CLASSES) {
+    const classRegex = new RegExp(`class ${className}[^{]*\\{([^}]+(?:\\{[^}]*\\}[^}]*)*)\\}`, 'g');
+    let match;
+    while ((match = classRegex.exec(content)) !== null) {
+      const classBody = match[1];
+
+      // Extract methods
+      const methodRegex = /(\w+)\s*\(([^)]*)\)\s*:\s*([^;]+)/g;
+      let methodMatch;
+      while ((methodMatch = methodRegex.exec(classBody)) !== null) {
+        examples.push({
+          className,
+          methodName: methodMatch[1],
+          description: `${className}.${methodMatch[1]} method`,
+          parameters: parseParams(methodMatch[2]),
+          returnType: methodMatch[3].trim()
+        });
+      }
+    }
+  }
+
+  return examples;
+}
+
+// Extract from source files
+function extractFromSource(): APIExample[] {
+  const examples: APIExample[] = [];
+  const sourcePath = path.join(CESIUM_SOURCE, 'packages', 'engine', 'Source');
+
+  if (!fs.existsSync(sourcePath)) {
+    console.log('Source path not found:', sourcePath);
+    return examples;
+  }
+
+  function processDir(dir: string) {
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        processDir(fullPath);
+      } else if (file.endsWith('.js') || file.endsWith('.ts')) {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf-8');
+
+          // Extract JSDoc comments with examples
+          const jsdocRegex = /\/\*\*[\s\S]*?\*\//g;
+          let match;
+          while ((match = jsdocRegex.exec(content)) !== null) {
+            const jsdoc = match[0];
+            if (jsdoc.includes('@example')) {
+              const exampleMatch = jsdoc.match(/@example[\s\S]*?(?=@|\*\/)/);
+              if (exampleMatch) {
+                const funcMatch = content.slice(match.index + match[0].length, match.index + match[0].length + 500)
+                  .match(/(?:function\s+)?(\w+)\s*[=(]/);
+                if (funcMatch) {
+                  examples.push({
+                    className: path.basename(file, path.extname(file)),
+                    methodName: funcMatch[1],
+                    description: extractDescription(jsdoc),
+                    parameters: [],
+                    returnType: 'unknown',
+                    example: exampleMatch[0].replace(/@example\s*/, '').trim()
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Skip files that can't be read
+        }
+      }
+    }
+  }
+
+  processDir(sourcePath);
+  return examples;
+}
+
+function parseParams(paramStr: string): { name: string; type: string; description: string }[] {
+  if (!paramStr.trim()) return [];
+  return paramStr.split(',').map(p => {
+    const parts = p.trim().split(':');
+    return {
+      name: parts[0]?.replace('?', '').trim() || '',
+      type: parts[1]?.trim() || 'any',
+      description: ''
+    };
+  }).filter(p => p.name);
+}
+
+function extractDescription(jsdoc: string): string {
+  const descMatch = jsdoc.match(/\/\*\*\s*\n?\s*\*?\s*([^@*][^\n]*)/);
+  return descMatch ? descMatch[1].trim() : '';
+}
+
+// Main
+const allExamples = [...extractFromDTS(), ...extractFromSource()];
+console.log(`Extracted ${allExamples.length} API examples`);
+
+fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allExamples, null, 2));
+console.log(`Saved to ${OUTPUT_FILE}`);
+EOF
+```
 
 ---
 
-## Quick Reference: File Locations
+## TASK 6: Run Documentation Extraction
 
-| Task | File |
-|------|------|
-| Tool definitions | `src/mcp/cesium-mcp-server.ts` |
-| Type definitions | `src/cesium/types.ts` |
-| CZML generators | `src/cesium/czml-generator.ts` |
-| Command handlers | `src/cesium/command-executor.ts` |
-| Training generator | `training/generate-training-data.ts` |
-| System prompts | `src/llm/prompts.ts` |
-| Fine-tune config | `training/finetune-config.json` |
+Execute the documentation extraction script.
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+npx tsx extract-cesium-docs.ts || echo "Extraction completed with warnings"
+```
 
 ---
 
-## Ralph-Loop Command
+## TASK 7: Add Cesium Doc Generator to Training Data Generator
 
-To run all parallelizable tasks:
+Update the training data generator to use the Cesium documentation examples.
+Add the generateCesiumDocExample function to the generators list.
 
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+# Find the line with "// Astrodynamics examples" and add the Cesium doc generator before it
+sed -i.bak 's/\/\/ Astrodynamics examples (orbital mechanics, RIC frames, covariance)/\/\/ Cesium documentation examples (API terminology, proper method names)\n    { fn: generateCesiumDocExample, weight: 12 },\n\n    \/\/ Astrodynamics examples (orbital mechanics, RIC frames, covariance)/' generate-training-data.ts
 ```
-Implement all Phase 1 and Phase 2 tasks from tasks.md in parallel:
-- Phase 1 has 6 independent streams (MCP Server tools)
-- Phase 2 has 4 independent streams (Training data)
-Run npm run build after each stream completes to verify.
-Mark items complete in tasks.md as you finish them.
+
+---
+
+## TASK 8: Generate Comprehensive Training Data
+
+Generate 150K+ training examples with:
+- All 80+ CesiumJS MCP tools
+- Balanced distribution across tools
+- Astrodynamics terminology (radial, in-track, cross-track, RIC, LVLH)
+- Cesium documentation terminology (heading, pitch, roll, Cartographic, etc.)
+- Compound commands (multi-step requests)
+- Conversational follow-ups
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+npx tsx generate-training-data.ts
 ```
+
+---
+
+## TASK 9: Verify Training Data Quality
+
+Check the distribution of generated training data.
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+echo "=== Training Data Statistics ===" && \
+wc -l generated-training-data.jsonl && \
+echo "" && \
+echo "=== Tool Distribution (top 20) ===" && \
+cat generated-training-data.jsonl | jq -r '.output' | jq -r '.tool' 2>/dev/null | sort | uniq -c | sort -rn | head -20 && \
+echo "" && \
+echo "=== Sample Examples ===" && \
+head -5 generated-training-data.jsonl | jq '.'
+```
+
+---
+
+## TASK 10: Verify Python Dependencies
+
+Install/verify Python dependencies for fine-tuning.
+
+```bash
+pip3 install torch transformers peft datasets accelerate bitsandbytes --upgrade --quiet
+```
+
+---
+
+## TASK 11: Run Fine-Tuning with LoRA
+
+Fine-tune Qwen2.5-0.5B-Instruct on the generated training data.
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+python3 finetune_lora.py \
+  --model_name "Qwen/Qwen2.5-0.5B-Instruct" \
+  --dataset "./generated-training-data.jsonl" \
+  --output_dir "./cesium-qwen-lora" \
+  --num_epochs 3 \
+  --batch_size 4 \
+  --learning_rate 2e-5 \
+  --lora_r 32 \
+  --lora_alpha 64 \
+  --max_length 512
+```
+
+---
+
+## TASK 12: Merge LoRA Weights
+
+Merge the LoRA adapter weights into the base model.
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+python3 -c "
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+import torch
+
+base_model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B-Instruct', torch_dtype=torch.float16)
+model = PeftModel.from_pretrained(base_model, './cesium-qwen-lora')
+merged = model.merge_and_unload()
+merged.save_pretrained('./cesium-qwen-lora/merged')
+
+tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-0.5B-Instruct')
+tokenizer.save_pretrained('./cesium-qwen-lora/merged')
+print('Model merged and saved to ./cesium-qwen-lora/merged')
+"
+```
+
+---
+
+## TASK 13: Verify Output
+
+Verify the fine-tuned model was created successfully.
+
+```bash
+echo "=== Fine-tuned Model Files ===" && \
+ls -la /Users/tj/software/OrbPro-Small-Language-Model/training/cesium-qwen-lora/ && \
+echo "" && \
+echo "=== Merged Model Files ===" && \
+ls -la /Users/tj/software/OrbPro-Small-Language-Model/training/cesium-qwen-lora/merged/ 2>/dev/null || echo "Merged model not yet created"
+```
+
+---
+
+## TASK 14: Test Model Inference
+
+Quick test of the fine-tuned model.
+
+```bash
+cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
+python3 -c "
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+model_path = './cesium-qwen-lora/merged'
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16)
+
+test_prompts = [
+    'Fly to Paris',
+    'Add a red sphere at New York',
+    'Set camera heading to 45 degrees',
+    'Add covariance ellipsoid 10km radial 20km in-track 5km cross-track',
+    'Switch to 2D mode'
+]
+
+for prompt in test_prompts:
+    inputs = tokenizer(prompt, return_tensors='pt')
+    outputs = model.generate(**inputs, max_new_tokens=100, temperature=0.1)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print(f'Prompt: {prompt}')
+    print(f'Response: {response}')
+    print('---')
+"
+```
+
+---
+
+## TASK 15: Export for WebLLM (Optional)
+
+Convert the model to MLC format for browser deployment.
+
+```bash
+echo "To export for WebLLM/MLC, run:"
+echo "pip install mlc-llm"
+echo "mlc_llm convert --model ./cesium-qwen-lora/merged --output ./cesium-slm-mlc"
+echo ""
+echo "See training/finetune/export_mlc.py for detailed export instructions"
+```
+
+---
+
+## Summary
+
+Training pipeline complete. Files created:
+- `training/cesium-api-examples.json` - Extracted Cesium API documentation
+- `training/generated-training-data.jsonl` - 150K+ training examples
+- `training/cesium-qwen-lora/` - LoRA adapter weights
+- `training/cesium-qwen-lora/merged/` - Merged fine-tuned model
+
+The fine-tuned model includes:
+- 80+ CesiumJS MCP tools
+- Astrodynamics terminology (RIC, LVLH, radial, in-track, cross-track)
+- Cesium API terminology (heading, pitch, roll, Cartographic, etc.)
+- Multi-step compound commands
+- Conversational follow-ups
