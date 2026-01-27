@@ -4,25 +4,61 @@
  */
 
 import { WebLLMEngine, checkWebGPUSupport, RECOMMENDED_MODELS } from './llm/web-llm-engine';
+import { APILLMEngine } from './llm/api-llm-engine';
 import { CommandParser } from './llm/command-parser';
 import { CesiumCommandExecutor } from './cesium/command-executor';
-import { CesiumMCPServer } from './mcp/cesium-mcp-server';
-import { BrowserTransport } from './mcp/browser-transport';
+import { WasmMCPServer } from './mcp/wasm-mcp-server';
 import { ChatInterface } from './ui/chat-interface';
 import { StatusDisplay } from './ui/status-display';
-import { ModelSelector } from './ui/model-selector';
+import { ModelSelector, ModelSelection } from './ui/model-selector';
 import type { CesiumCommand } from './cesium/types';
+
+// Union type for LLM engines
+type LLMEngine = WebLLMEngine | APILLMEngine;
 
 // Types for Cesium (loaded from CDN)
 declare const Cesium: {
   Viewer: new (container: string | HTMLElement, options?: object) => CesiumViewer;
   Ion: { defaultAccessToken: string };
   SkyAtmosphere: new () => unknown;
+  Cartographic: {
+    fromCartesian: (cartesian: Cartesian3, ellipsoid?: unknown, result?: Cartographic) => Cartographic;
+  };
+  Math: {
+    toDegrees: (radians: number) => number;
+  };
+  defined: (value: unknown) => boolean;
 };
 
+interface Cartesian3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface Cartographic {
+  longitude: number;
+  latitude: number;
+  height: number;
+}
+
+interface CesiumCamera {
+  position: Cartesian3;
+  positionCartographic: Cartographic;
+  direction: Cartesian3;
+  pickEllipsoid: (windowPosition: { x: number; y: number }, ellipsoid?: unknown, result?: Cartesian3) => Cartesian3 | undefined;
+  moveEnd: { addEventListener: (callback: () => void) => () => void };
+  changed: { addEventListener: (callback: () => void) => () => void };
+}
+
+interface CesiumScene {
+  canvas: HTMLCanvasElement;
+  globe: { ellipsoid: unknown };
+}
+
 interface CesiumViewer {
-  camera: unknown;
-  scene: unknown;
+  camera: CesiumCamera;
+  scene: CesiumScene;
   clock: unknown;
   dataSources: unknown;
   entities: unknown;
@@ -32,10 +68,10 @@ interface CesiumViewer {
 }
 
 export class CesiumSLMApp {
-  private llmEngine: WebLLMEngine | null = null;
+  private llmEngine: LLMEngine | null = null;
   private commandParser: CommandParser;
   private commandExecutor: CesiumCommandExecutor | null = null;
-  private mcpServer: CesiumMCPServer | null = null;
+  private mcpServer: WasmMCPServer | null = null;
   private viewer: CesiumViewer | null = null;
 
   private chatInterface: ChatInterface | null = null;
@@ -43,6 +79,7 @@ export class CesiumSLMApp {
   private modelSelector: ModelSelector | null = null;
 
   private conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  private currentModelSelection: ModelSelection | null = null;
 
   constructor() {
     this.commandParser = new CommandParser();
@@ -84,8 +121,7 @@ export class CesiumSLMApp {
     try {
       this.modelSelector = new ModelSelector({
         containerId: config.modelSelectorContainer,
-        onSelect: (modelId) => this.loadModel(modelId),
-        defaultModel: RECOMMENDED_MODELS.trained[0], // Use trained Cesium model
+        onSelect: (selection: ModelSelection) => this.loadModel(selection),
       });
     } catch (error) {
       throw new Error(`ModelSelector init failed: ${error instanceof Error ? error.message : error}`);
@@ -112,18 +148,16 @@ export class CesiumSLMApp {
       throw new Error(`ChatInterface init failed: ${error instanceof Error ? error.message : error}`);
     }
 
-    // Add welcome message
-    this.chatInterface.addMessage({
-      role: 'system',
-      content: 'Loading Cesium language model...',
-      timestamp: new Date(),
-    });
+    // Try to auto-load last used model
+    const autoLoaded = await this.modelSelector.autoLoadLastModel();
 
-    // Auto-load the trained model on startup
-    const defaultModel = RECOMMENDED_MODELS.trained[0];
-    if (defaultModel) {
-      // Use setTimeout to allow the UI to render first
-      setTimeout(() => this.loadModel(defaultModel), 100);
+    // Add welcome message only if NOT auto-loading (auto-load shows its own messages)
+    if (!autoLoaded) {
+      this.chatInterface.addMessage({
+        role: 'system',
+        content: 'Select a language model to get started. API models (Ollama, OpenAI) are recommended for best results.',
+        timestamp: new Date(),
+      });
     }
   }
 
@@ -158,20 +192,91 @@ export class CesiumSLMApp {
     // Create command executor
     this.commandExecutor = new CesiumCommandExecutor(this.viewer as never);
 
-    // Create MCP server
-    const transport = new BrowserTransport();
-    await transport.connect();
-
-    this.mcpServer = new CesiumMCPServer(
-      transport,
+    // Create WASM MCP server
+    this.mcpServer = new WasmMCPServer(
       (command: CesiumCommand) => this.commandExecutor!.execute(command)
     );
+    await this.mcpServer.initialize();
+    console.log('[CesiumSLMApp] WASM MCP server initialized');
+
+    // Set up camera tracking to update MCP server with current camera state
+    // This enables "addSphereHere" and similar tools that place objects at camera target
+    this.setupCameraTracking();
   }
 
-  private async loadModel(modelId: string): Promise<void> {
+  /**
+   * Set up camera tracking to keep MCP server aware of current camera position
+   * This enables "Here" tools that place objects where the camera is looking
+   */
+  private setupCameraTracking(): void {
+    if (!this.viewer || !this.mcpServer) return;
+
+    const updateCameraState = () => {
+      if (!this.viewer || !this.mcpServer) return;
+
+      try {
+        const camera = this.viewer.camera;
+        const scene = this.viewer.scene;
+
+        // Get camera position in degrees
+        const camPos = camera.positionCartographic;
+        const camLon = Cesium.Math.toDegrees(camPos.longitude);
+        const camLat = Cesium.Math.toDegrees(camPos.latitude);
+        const camHeight = camPos.height;
+
+        // Calculate camera target (where camera is looking on the ground)
+        // Use center of screen as the target point
+        const canvas = scene.canvas;
+        const centerX = canvas.clientWidth / 2;
+        const centerY = canvas.clientHeight / 2;
+
+        let targetLon = camLon;
+        let targetLat = camLat;
+
+        // Pick ellipsoid at screen center to get where camera is pointing
+        const targetCartesian = camera.pickEllipsoid(
+          { x: centerX, y: centerY },
+          scene.globe?.ellipsoid
+        );
+
+        if (targetCartesian && Cesium.defined(targetCartesian)) {
+          const targetCarto = Cesium.Cartographic.fromCartesian(targetCartesian);
+          if (targetCarto) {
+            targetLon = Cesium.Math.toDegrees(targetCarto.longitude);
+            targetLat = Cesium.Math.toDegrees(targetCarto.latitude);
+          }
+        }
+
+        // Update MCP server with camera state
+        this.mcpServer!.updateCameraState(camLon, camLat, camHeight, targetLon, targetLat);
+
+      } catch (error) {
+        // Ignore errors during camera tracking
+        console.debug('[CameraTracking] Error updating camera state:', error);
+      }
+    };
+
+    // Update on camera move end (when user stops panning/zooming)
+    this.viewer.camera.moveEnd.addEventListener(updateCameraState);
+
+    // Also update on camera changed (for smoother tracking)
+    this.viewer.camera.changed.addEventListener(updateCameraState);
+
+    // Initial update
+    updateCameraState();
+
+    console.log('[CesiumSLMApp] Camera tracking enabled for "Here" tools');
+  }
+
+  private async loadModel(selection: ModelSelection): Promise<void> {
     if (!this.statusDisplay || !this.modelSelector || !this.chatInterface) {
       return;
     }
+
+    this.currentModelSelection = selection;
+    const displayName = selection.type === 'api'
+      ? `${selection.provider}/${selection.modelId}`
+      : selection.modelId;
 
     // Hide model selector during loading
     this.modelSelector.hide();
@@ -180,49 +285,70 @@ export class CesiumSLMApp {
       loading: true,
       loaded: false,
       progress: 0,
-      name: modelId,
+      name: displayName,
     });
 
-    // Detect small models that need compact prompts (< 3B parameters typically have 4k context)
-    const isSmallModel = modelId.includes('0.5B') ||
-                         modelId.includes('360M') ||
-                         modelId.includes('1.5B') ||
-                         modelId.includes('SmolLM2');
-
     try {
-      this.llmEngine = new WebLLMEngine({
-        modelId,
-        temperature: 0.7,
-        topP: 0.9,
-        maxTokens: 512,
-        // Use compact prompt for small models to fit within context window
-        useCompactPrompt: isSmallModel,
-        onProgress: (progress) => {
-          this.statusDisplay?.updateModel({
-            loading: true,
-            progress: progress.progress,
-            name: modelId,
-          });
-        },
-      });
+      if (selection.type === 'api') {
+        // API-based model (Ollama, OpenAI, etc.)
+        this.llmEngine = new APILLMEngine({
+          provider: selection.provider!,
+          model: selection.modelId,
+          apiKey: selection.apiKey,
+          baseUrl: selection.baseUrl,
+          temperature: 0.7,
+          maxTokens: 512,
+        });
 
-      await this.llmEngine.initialize();
+        await this.llmEngine.initialize();
 
-      // Set up tools from MCP server
-      if (this.mcpServer) {
-        this.llmEngine.setTools(this.mcpServer.getToolDefinitions());
+        // Set up tools from MCP server
+        if (this.mcpServer) {
+          this.llmEngine.setTools(this.mcpServer.getToolDefinitions());
+        }
+
+        this.statusDisplay.updateModel({
+          loaded: true,
+          loading: false,
+          progress: 1,
+          name: displayName,
+        });
+
+      } else {
+        // Browser-based WebLLM model
+        this.llmEngine = new WebLLMEngine({
+          modelId: selection.modelId,
+          temperature: 0.7,
+          topP: 0.9,
+          maxTokens: 512,
+          useCompactPrompt: true,
+          onProgress: (progress) => {
+            this.statusDisplay?.updateModel({
+              loading: true,
+              progress: progress.progress,
+              name: displayName,
+            });
+          },
+        });
+
+        await this.llmEngine.initialize();
+
+        // Set up tools from MCP server
+        if (this.mcpServer) {
+          this.llmEngine.setTools(this.mcpServer.getToolDefinitions());
+        }
+
+        this.statusDisplay.updateModel({
+          loaded: true,
+          loading: false,
+          progress: 1,
+          name: displayName,
+        });
       }
-
-      this.statusDisplay.updateModel({
-        loaded: true,
-        loading: false,
-        progress: 1,
-        name: modelId,
-      });
 
       this.chatInterface.addMessage({
         role: 'system',
-        content: `Model loaded successfully! You can now control the globe using natural language. Try saying "Show me Tokyo" or "Add a blue marker at the Statue of Liberty".`,
+        content: `Model loaded: ${displayName}. You can now control the globe using natural language. Try saying "Show me Tokyo" or "Add a blue marker at the Statue of Liberty".`,
         timestamp: new Date(),
       });
 
@@ -283,31 +409,24 @@ export class CesiumSLMApp {
     }
 
     try {
-      // ALWAYS try rule-based parsing first for deterministic, reliable results
-      // This handles navigation AND geometry creation with correct coordinates
-      const ruleBasedResult = this.commandParser.parseNaturalLanguage(message);
+      // Let the LLM handle all commands via MCP tool calls
+      // The MCP server has the location database and handles coordinate resolution
 
-      if (ruleBasedResult.success && ruleBasedResult.commands.length > 0) {
-        await this.executeCommands(ruleBasedResult.commands);
-        this.chatInterface.addMessage({
-          role: 'assistant',
-          content: `Done`,
-          timestamp: new Date(),
-          toolCalls: ruleBasedResult.commands.map(c => ({ name: c.type, arguments: c })),
-        });
-        return;
-      }
+      // Allow browser to repaint and show thinking indicator before LLM inference
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-      // Only fall back to LLM for complex queries that rule-based parser can't handle
-      // (multi-step commands, queries, or locations not in our database)
       const response = await this.llmEngine.generate(message);
 
       // Check for tool calls from LLM
       if (response.toolCalls && response.toolCalls.length > 0) {
-        const parseResult = this.commandParser.parseToolCalls(response.toolCalls);
-
-        if (parseResult.success) {
-          await this.executeCommands(parseResult.commands);
+        // Execute tool calls through MCP server (handles location-aware tools)
+        const toolResults: Array<{ name: string; success: boolean; message: string }> = [];
+        for (const toolCall of response.toolCalls) {
+          if (this.mcpServer) {
+            const result = await this.mcpServer.executeToolDirect(toolCall.name, toolCall.arguments);
+            toolResults.push({ name: toolCall.name, ...result });
+            console.log(`Tool ${toolCall.name} result:`, result);
+          }
         }
 
         this.chatInterface.addMessage({

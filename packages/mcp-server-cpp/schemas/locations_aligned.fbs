@@ -1,0 +1,56 @@
+// Location Database FlatBuffer Schema - ALIGNED VERSION
+// For zero-copy WASM interop with fixed-size structures
+//
+// Compile with flatc-wasm aligned codegen:
+//   generateAlignedCode(source, { defaultStringLength: 127 })
+
+namespace cesium.mcp;
+
+// Type flags for locations (bit flags allow combining)
+enum LocationType : ushort {
+  Unknown = 0,
+  State = 1,
+  City = 2,
+  Landmark = 4,
+  Country = 8,
+  Region = 16,
+  Airport = 32
+}
+
+// Single location entry - fixed 160 bytes per record
+// Using struct for fixed-size layout (not table which has vtables)
+struct AlignedLocation {
+  // Primary name (null-terminated, max 127 chars + null = 128 bytes)
+  name: [ubyte:128];
+
+  // Coordinates (8 bytes)
+  longitude: float;    // Degrees (-180 to 180)
+  latitude: float;     // Degrees (-90 to 90)
+
+  // Optional heading and metadata (8 bytes)
+  heading: float;      // Heading in degrees (0-360), -1 if not set
+  population: uint32;  // Population (0 if unknown)
+
+  // Type and reserved (4 bytes)
+  type: LocationType;  // Location type flags
+  reserved: ushort;    // Padding/future use
+}
+
+// Database header - 64 bytes
+struct AlignedLocationDatabaseHeader {
+  // Magic number "LOCDB001" (8 bytes)
+  magic: [ubyte:8];
+
+  // Metadata (16 bytes)
+  version: uint32;
+  flags: uint32;
+  location_count: uint32;
+  reserved1: uint32;
+
+  // Timestamps (16 bytes)
+  created_timestamp: uint64;
+  modified_timestamp: uint64;
+
+  // Reserved for future use (24 bytes)
+  reserved2: [ubyte:24];
+}

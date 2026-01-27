@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Model Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #fff; }
+    #log { white-space: pre-wrap; background: #000; padding: 10px; height: 400px; overflow-y: auto; }
+    input { width: 80%; padding: 10px; font-size: 16px; }
+    button { padding: 10px 20px; font-size: 16px; margin: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Model Test</h1>
+  <button id="loadHF">Load HuggingFace Qwen2.5-0.5B (known working)</button>
+  <button id="loadLocal">Load Local Custom Model</button>
+  <div id="log">Click a button to load a model...</div>
+  <br>
+  <input type="text" id="input" placeholder="Type a message..." disabled>
+  <button id="send" disabled>Send</button>
+
+  <script type="module">
+    const log = document.getElementById('log');
+    const input = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    let engine = null;
+
+    function addLog(msg) {
+      log.textContent += '\n' + msg;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function clearLog() {
+      log.textContent = '';
+    }
+
+    async function loadModel(modelId, customConfig = null) {
+      clearLog();
+
+      // Clear ALL caches before loading to ensure fresh fetch
+      addLog('Clearing browser caches...');
+      try {
+        const cacheNames = await window.caches.keys();
+        for (const name of cacheNames) {
+          console.log('Deleting cache:', name);
+          await window.caches.delete(name);
+        }
+        addLog('Cleared Cache API');
+      } catch (e) {
+        addLog('Cache API clear error: ' + e.message);
+      }
+
+      try {
+        const dbs = await window.indexedDB.databases();
+        for (const db of dbs) {
+          if (db.name) {
+            console.log('Deleting IndexedDB:', db.name);
+            window.indexedDB.deleteDatabase(db.name);
+          }
+        }
+        addLog('Cleared IndexedDB');
+      } catch (e) {
+        addLog('IndexedDB clear error: ' + e.message);
+      }
+
+      addLog('Importing web-llm...');
+      const { CreateMLCEngine } = await import('https://esm.run/@mlc-ai/web-llm');
+      addLog('web-llm imported');
+      addLog('Loading model: ' + modelId);
+
+      try {
+        const options = {
+          initProgressCallback: (report) => {
+            log.textContent = log.textContent.replace(/Loading:.*$/m, '');
+            addLog('Loading: ' + report.text);
+          }
+        };
+
+        if (customConfig) {
+          options.appConfig = {
+            model_list: [customConfig]
+          };
+        }
+
+        engine = await CreateMLCEngine(modelId, options);
+
+        addLog('\n=== MODEL LOADED ===\n');
+        input.disabled = false;
+        sendBtn.disabled = false;
+
+      } catch (err) {
+        addLog('INIT ERROR: ' + err.message);
+        console.error(err);
+      }
+    }
+
+    // Load HuggingFace model (known working)
+    document.getElementById('loadHF').onclick = () => {
+      loadModel('Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
+    };
+
+    // Load local custom model
+    document.getElementById('loadLocal').onclick = () => {
+      const origin = window.location.origin;
+      loadModel('OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC', {
+        model: origin + '/models/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/',
+        model_id: 'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC',
+        model_lib: origin + '/models/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC.wasm',
+        vram_required_MB: 512,
+        low_resource_required: true,
+      });
+    };
+
+    sendBtn.onclick = async () => {
+      if (!engine) return;
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      addLog('\n> ' + msg);
+      input.value = '';
+      sendBtn.disabled = true;
+
+      try {
+        const response = await engine.chat.completions.create({
+          messages: [{ role: 'user', content: msg }],
+          temperature: 0.7,
+          max_tokens: 256,
+        });
+
+        const reply = response.choices[0]?.message?.content || '(empty response)';
+        addLog('< ' + reply);
+      } catch (err) {
+        addLog('ERROR: ' + err.message);
+        console.error(err);
+      }
+
+      sendBtn.disabled = false;
+      input.focus();
+    };
+
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') sendBtn.click();
+    };
+  </script>
+</body>
+</html>

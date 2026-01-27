@@ -1,0 +1,92 @@
+// Terminology Mapping FlatBuffers Schema
+//
+// Maps military, civil, and colloquial terms to CesiumJS geometry types.
+// This allows the LLM to correctly interpret domain-specific language.
+//
+// File identifier: "TERM"
+
+namespace mcp.terminology;
+
+// ============================================================================
+// Geometry Types
+// ============================================================================
+
+enum GeometryType : uint8 {
+  Unknown = 0,
+  // 3D Shapes
+  Sphere = 1,
+  Box = 2,
+  Cylinder = 3,
+  Ellipsoid = 4,
+  SensorCone = 5,      // Partial ellipsoid for FOV visualization
+  Corridor = 6,
+  Wall = 7,
+  // 2D Shapes
+  Point = 10,
+  Label = 11,
+  Circle = 12,
+  Polygon = 13,
+  Polyline = 14,
+  Rectangle = 15,
+  // Special
+  Model = 20,          // glTF/glb models
+  Tileset = 21,        // 3D Tiles
+  ParticleSystem = 22,
+}
+
+// ============================================================================
+// Term Categories
+// ============================================================================
+
+enum TermCategory : uint8 {
+  General = 0,
+  Military = 1,        // Military/defense terminology
+  Aviation = 2,        // Aircraft and aviation
+  Maritime = 3,        // Naval and maritime
+  Space = 4,           // Satellite and space systems
+  Surveillance = 5,    // Sensors, radar, cameras
+  Civil = 6,           // Civil engineering, urban planning
+  Scientific = 7,      // Research facilities, observatories
+}
+
+// ============================================================================
+// Term Mapping Entry
+// ============================================================================
+
+table TermMapping {
+  // The term or phrase to match (lowercase, normalized)
+  term: string (required);
+
+  // Alternative spellings/phrases that map to the same geometry
+  aliases: [string];
+
+  // The geometry type this term maps to
+  geometry: GeometryType;
+
+  // Category for context-aware disambiguation
+  category: TermCategory;
+
+  // Default parameter values (JSON for flexibility)
+  // e.g., {"horizontalAngle": 45, "verticalAngle": 30}
+  default_params: string;
+
+  // Description for documentation
+  description: string;
+}
+
+// ============================================================================
+// Complete Terminology Database
+// ============================================================================
+
+table TerminologyDatabase {
+  // Version for cache invalidation
+  version: uint32;
+
+  // All term mappings
+  mappings: [TermMapping];
+}
+
+// Root and identifiers
+file_identifier "TERM";
+file_extension "terms";
+root_type TerminologyDatabase;

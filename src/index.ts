@@ -25,6 +25,9 @@ export type {
 } from './cesium/types';
 
 // MCP components
+export { WasmMCPServer } from './mcp/wasm-mcp-server';
+export type { ToolDefinition as WasmToolDefinition } from './mcp/wasm-mcp-server';
+// Legacy TypeScript MCP server (deprecated)
 export { CesiumMCPServer } from './mcp/cesium-mcp-server';
 export { BrowserTransport, BidirectionalBrowserTransport } from './mcp/browser-transport';
 export type { MCPMessage, MessageHandler } from './mcp/browser-transport';

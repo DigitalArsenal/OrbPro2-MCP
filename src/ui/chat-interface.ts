@@ -666,11 +666,20 @@ export class ChatInterface {
     this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
   }
 
+  private thinkingIndicator: HTMLElement | null = null;
+
   setProcessing(processing: boolean): void {
     this.isProcessing = processing;
     this.submitButton.disabled = processing;
     this.input.disabled = processing;
     this.submitButton.textContent = processing ? 'Processing...' : 'Send';
+
+    // Show/hide thinking indicator
+    if (processing) {
+      this.showThinkingIndicator();
+    } else {
+      this.hideThinkingIndicator();
+    }
 
     // Also disable/enable voice input
     if (this.voiceInputButton) {
@@ -679,6 +688,28 @@ export class ChatInterface {
       } else {
         this.voiceInputButton.enable();
       }
+    }
+  }
+
+  private showThinkingIndicator(): void {
+    if (this.thinkingIndicator) return;
+
+    this.thinkingIndicator = document.createElement('div');
+    this.thinkingIndicator.className = 'chat-message chat-message-assistant chat-thinking';
+    this.thinkingIndicator.innerHTML = `
+      <div class="chat-message-role">ASSISTANT</div>
+      <div class="chat-thinking-dots">
+        <span></span><span></span><span></span>
+      </div>
+    `;
+    this.messagesContainer.appendChild(this.thinkingIndicator);
+    this.scrollToBottom();
+  }
+
+  private hideThinkingIndicator(): void {
+    if (this.thinkingIndicator) {
+      this.thinkingIndicator.remove();
+      this.thinkingIndicator = null;
     }
   }
 
@@ -951,6 +982,63 @@ export class ChatInterface {
       .voice-button-container {
         display: flex;
         align-items: center;
+      }
+
+      /* Thinking indicator */
+      .chat-thinking {
+        animation: thinking-pulse 1.5s ease-in-out infinite;
+      }
+
+      .chat-thinking-dots {
+        display: flex;
+        gap: 4px;
+        padding: 8px 0;
+      }
+
+      .chat-thinking-dots span {
+        width: 8px;
+        height: 8px;
+        background: #6a6aaa;
+        border-radius: 50%;
+        animation: thinking-bounce 1.4s ease-in-out infinite;
+      }
+
+      .chat-thinking-dots span:nth-child(1) {
+        animation-delay: 0s;
+      }
+
+      .chat-thinking-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .chat-thinking-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes thinking-bounce {
+        0%, 80%, 100% {
+          transform: scale(0.6);
+          opacity: 0.5;
+        }
+        40% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+
+      @keyframes thinking-pulse {
+        0%, 100% {
+          opacity: 0.8;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      .chat-input:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background: #151525;
       }
     `;
 

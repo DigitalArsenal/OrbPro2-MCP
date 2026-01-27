@@ -51,7 +51,7 @@ if(EMSCRIPTEN)
             -s WASM=1 \
             -s MODULARIZE=1 \
             -s EXPORT_NAME='createMcpServer' \
-            -s EXPORTED_FUNCTIONS='[\"_handleMessage\",\"_init\",\"_getToolDefinitions\",\"_resolveLocation\",\"_listLocations\",\"_malloc\",\"_free\"]' \
+            -s EXPORTED_FUNCTIONS='[\"_handleMessage\",\"_init\",\"_getToolDefinitions\",\"_resolveLocation\",\"_listLocations\",\"_setCameraState\",\"_getCameraTarget\",\"_malloc\",\"_free\"]' \
             -s EXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"getValue\",\"setValue\"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=16777216 \

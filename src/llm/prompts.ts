@@ -418,6 +418,34 @@ export const FEW_SHOT_EXAMPLES = [
   },
   {
     category: 'entity',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Add a sensor fan that is 30 degrees wide and 50 degrees tall in Paris',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "Paris", "radius": 50000, "horizontalAngle": 30, "verticalAngle": 50, "color": "lime", "opacity": 0.5}}',
+    explanation: 'Sensor cone with horizontal and vertical FOV angles',
+  },
+  {
+    category: 'entity',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Add a radar cone at London pointing east, semi-transparent cyan',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "London", "radius": 100000, "horizontalAngle": 45, "verticalAngle": 30, "heading": 90, "color": "cyan", "opacity": 0.4}}',
+    explanation: 'Sensor cone with heading direction (90=east)',
+  },
+  {
+    category: 'entity',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Create a camera field of view visualization at the Eiffel Tower',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "Eiffel Tower", "radius": 500, "horizontalAngle": 60, "verticalAngle": 40, "color": "yellow", "opacity": 0.3}}',
+    explanation: 'Camera FOV is visualized as a sensor cone',
+  },
+  {
+    category: 'entity',
+    tool: 'addSensorCone',
+    userInput: 'Add a 30x50 degree sensor at coordinates 2.35, 48.85, lime green, semi-opaque',
+    response: '{"tool": "addSensorCone", "arguments": {"longitude": 2.35, "latitude": 48.85, "radius": 50000, "horizontalAngle": 30, "verticalAngle": 50, "color": "lime", "opacity": 0.5}}',
+    explanation: 'Coordinate-based sensor cone when user provides lat/lon',
+  },
+  {
+    category: 'entity',
     tool: 'addBox',
     userInput: 'Put a 100x200x150 meter box in Sydney',
     response: '{"tool": "addBox", "arguments": {"longitude": 151.2093, "latitude": -33.8688, "dimensionX": 100, "dimensionY": 200, "dimensionZ": 150, "name": "Sydney Box", "color": "blue"}}',
@@ -1756,6 +1784,34 @@ export const FEW_SHOT_EXAMPLES = [
     response: '{"tool": "addCircle", "arguments": {"longitude": 0, "latitude": 0, "radius": 100, "name": "Ring", "color": "white"}}',
     explanation: 'Ring/flat circular area uses addCircle',
   },
+  {
+    category: 'disambiguation',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Add a sensor fan at Paris',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "Paris", "radius": 50000, "horizontalAngle": 45, "verticalAngle": 30, "color": "lime", "opacity": 0.5}}',
+    explanation: 'Sensor fan is a sensor cone (partial ellipsoid)',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Create a radar cone',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "requested location", "radius": 100000, "horizontalAngle": 45, "verticalAngle": 30}}',
+    explanation: 'Radar cone uses addSensorConeAtLocation',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Show camera field of view',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "requested location", "radius": 1000, "horizontalAngle": 60, "verticalAngle": 40, "color": "yellow", "opacity": 0.3}}',
+    explanation: 'Camera FOV is a sensor cone',
+  },
+  {
+    category: 'disambiguation',
+    tool: 'addSensorConeAtLocation',
+    userInput: 'Add a detection zone',
+    response: '{"tool": "addSensorConeAtLocation", "arguments": {"locationName": "requested location", "radius": 50000, "horizontalAngle": 90, "verticalAngle": 45, "color": "cyan", "opacity": 0.4}}',
+    explanation: 'Detection zone is a sensor cone',
+  },
 ] as const;
 
 /**
@@ -1763,24 +1819,41 @@ export const FEW_SHOT_EXAMPLES = [
  */
 export const SYSTEM_PROMPT_BASE = `You are a CesiumJS globe controller assistant. Your job is to help users interact with a 3D globe visualization by executing tool commands.
 
+## CRITICAL: USE LOCATION-AWARE TOOLS
+
+ALWAYS use location-aware tools when a place name is mentioned. NEVER guess or hallucinate coordinates.
+
+PREFERRED TOOLS (use these when you have a place name):
+- flyToLocation: Fly to a named place. Args: locationName, height, duration
+- addSphereAtLocation: Add sphere at named place. Args: locationName, radius, color, name
+- addBoxAtLocation: Add box at named place. Args: locationName, dimensionX, dimensionY, dimensionZ, color, name
+- addPointAtLocation: Add marker at named place. Args: locationName, color, name
+- addSensorConeAtLocation: Add sensor cone/fan/radar/camera FOV at named place. Args: locationName, radius, horizontalAngle (degrees), verticalAngle (degrees), heading, pitch, color, opacity, name
+- resolveLocation: Get coordinates for a place name. Args: locationName
+
+FALLBACK TOOLS (only use when user provides raw coordinates):
+- flyTo, addSphere, addBox, addPoint, addSensorCone, etc.
+
+## SENSOR TERMINOLOGY
+
+"sensor fan", "radar cone", "camera FOV", "detection zone", "cone segment" → Use addSensorConeAtLocation
+- horizontalAngle: width in degrees (1-360)
+- verticalAngle: height in degrees (1-180)
+- heading: direction it points (0=North, 90=East)
+- pitch: tilt angle (-90=down, 0=horizontal)
+- opacity: transparency (0-1, default 0.5)
+
 ## YOUR RESPONSE FORMAT
 
 When executing commands, respond with ONLY a JSON object. Do not include any other text, markdown, or explanation.
 
 CORRECT format:
-{"tool": "flyTo", "arguments": {"longitude": -74.006, "latitude": 40.7128, "height": 500000}}
+{"tool": "flyToLocation", "arguments": {"locationName": "Golden Gate Bridge", "height": 1000}}
 
 INCORRECT formats (never do these):
 - \`\`\`json {"tool": "flyTo", ...} \`\`\` (no markdown code blocks)
 - "I'll fly you to New York: {"tool": ...}" (no text before/after)
-- {"tool": "flyTo", args: {...}} (use "arguments" not "args")
-
-## COORDINATE FORMAT
-
-Always use this format for positions:
-- longitude: number between -180 and 180 (negative = West, positive = East)
-- latitude: number between -90 and 90 (negative = South, positive = North)
-- height: positive number in meters
+- {"tool": "flyTo", "arguments": {"longitude": ...}} when user said a place NAME (use flyToLocation!)
 
 ## HEIGHT RECOMMENDATIONS
 
@@ -1804,16 +1877,20 @@ Valid colors: red, green, blue, yellow, orange, purple, pink, cyan, white, black
 
 ## HANDLING SPECIAL CASES
 
-1. UNKNOWN LOCATIONS: If the user asks about a place you don't know the coordinates for, respond with text:
-   "I don't have coordinates for that location. Could you provide the latitude and longitude, or describe a nearby major city?"
+1. NAMED LOCATIONS: ALWAYS use location-aware tools (flyToLocation, addBoxAtLocation, etc.)
+   User: "fly to Paris" → {"tool": "flyToLocation", "arguments": {"locationName": "Paris"}}
+   User: "add red sphere at CERN" → {"tool": "addSphereAtLocation", "arguments": {"locationName": "CERN", "radius": 1000, "color": "red"}}
 
-2. CAPABILITY QUESTIONS: If the user asks "what can you do?" or similar, respond with text explaining your tools.
+2. SENSOR/RADAR/FOV REQUESTS: Use addSensorConeAtLocation (ask for location if not provided)
+   User: "add sensor fan 30 wide 50 tall at Paris" → {"tool": "addSensorConeAtLocation", "arguments": {"locationName": "Paris", "radius": 50000, "horizontalAngle": 30, "verticalAngle": 50, "color": "lime", "opacity": 0.5}}
+   User: "radar cone pointing east" → {"tool": "addSensorConeAtLocation", "arguments": {"locationName": "[ask for location]", "radius": 100000, "horizontalAngle": 45, "verticalAngle": 30, "heading": 90}}
 
-3. MULTIPLE OPERATIONS: For requests like "go to Paris and add a marker", output multiple JSON objects on separate lines:
-   {"tool": "flyTo", "arguments": {...}}
-   {"tool": "addPoint", "arguments": {...}}
+3. USER PROVIDES COORDINATES: Only then use coordinate-based tools like flyTo, addBox.
+   User: "fly to 40.7, -74.0" → {"tool": "flyTo", "arguments": {"longitude": -74.0, "latitude": 40.7}}
 
-4. USER PROVIDES COORDINATES: When the user provides coordinates like "40.7128, -74.006", use them directly. Note that users often say "latitude, longitude" order.
+4. MULTIPLE OPERATIONS: Output multiple JSON objects on separate lines:
+   {"tool": "flyToLocation", "arguments": {"locationName": "Paris"}}
+   {"tool": "addPointAtLocation", "arguments": {"locationName": "Paris"}}
 `;
 
 /**
@@ -1930,38 +2007,39 @@ const COMPACT_SYSTEM_PROMPT = `You are a CesiumJS globe controller. Output ONLY 
 
 FORMAT: {"tool": "toolName", "arguments": {...}}
 
-=== CAMERA (11 tools) ===
-flyTo: Fly to location. Args: longitude, latitude, height, duration
-setView: Instant teleport. Args: longitude, latitude, height, heading, pitch
-lookAt: Orient toward target. Args: longitude, latitude, range
-zoom: Zoom in/out. Args: amount (positive=in, negative=out)
-getCamera: Get position. Args: {}
-rotateCamera: Rotate view. Args: heading, pitch (degrees)
-trackEntity: Follow moving entity. Args: entityId
-stopTracking: Stop following. Args: {}
-orbitTarget: Circle around location. Args: longitude, latitude, duration, radius
-stopOrbit: Stop orbiting. Args: {}
-flyToEntity: Fly to existing entity. Args: entityId, duration, heading, pitch, range
+CRITICAL: When user mentions a place NAME (not coordinates), ALWAYS use location-aware tools!
 
-=== 3D SHAPES (8 tools) ===
-addSphere: 3D ball/sphere. Args: longitude, latitude, radius, name, color, height
-addEllipsoid: 3D ellipsoid. Args: longitude, latitude, radiiX, radiiY, radiiZ, name, color
-addBox: 3D box/cube. Args: longitude, latitude, dimensionX, dimensionY, dimensionZ, name, color
-addCylinder: Cylinder/cone. Args: longitude, latitude, length, topRadius, bottomRadius, name, color
-addCorridor: Road/path with width. Args: positions[], width, name, color, extrudedHeight
-addWall: Vertical wall. Args: positions[], maximumHeights[], minimumHeights[], name, color
-addRectangle: Rectangle bounds. Args: west, south, east, north, name, color, extrudedHeight
-addModel: 3D glTF model. Args: longitude, latitude, url, scale, name
+=== LOCATION-AWARE TOOLS (USE THESE FIRST!) ===
+flyToLocation: Fly to named place. Args: locationName, height, duration
+  Example: {"tool": "flyToLocation", "arguments": {"locationName": "Paris", "height": 50000}}
+addSphereAtLocation: Sphere at named place. Args: locationName, radius, color, name, height
+  Example: {"tool": "addSphereAtLocation", "arguments": {"locationName": "CERN", "radius": 50000, "color": "red"}}
+addBoxAtLocation: Box at named place. Args: locationName, dimensionX, dimensionY, dimensionZ, color, name, heading
+  - heading: rotation in degrees (0=North, 90=East, 180=South, 270=West)
+  - dimensionY goes along the heading direction (length), dimensionX is perpendicular (width)
+  - Common headings: Golden Gate Bridge~28°, Brooklyn Bridge~45°, Empire State~29°
+  Example: {"tool": "addBoxAtLocation", "arguments": {"locationName": "Golden Gate Bridge", "dimensionX": 30, "dimensionY": 2700, "dimensionZ": 227, "color": "red", "heading": 28}}
+addPointAtLocation: Marker at named place. Args: locationName, color, name
+addSensorConeAtLocation: Sensor/radar/camera FOV cone at named place. Args: locationName, radius (range in meters), horizontalAngle (1-360°), verticalAngle (1-180°), heading, pitch, color, opacity, name
+  Example: {"tool": "addSensorConeAtLocation", "arguments": {"locationName": "Paris", "radius": 50000, "horizontalAngle": 30, "verticalAngle": 50, "color": "lime", "opacity": 0.5}}
+resolveLocation: Get coordinates for place name. Args: locationName
 
-=== 2D ENTITIES (9 tools) ===
-addPoint: Marker/pin. Args: longitude, latitude, name, color
-addLabel: Text label. Args: longitude, latitude, text, color, font
-addPolyline: Line between points. Args: positions[], name, color, width
-addPolygon: Filled shape. Args: positions[], name, color, extrudedHeight
-addCircle: Flat circle on ground. Args: longitude, latitude, radius, name, color
-addBillboard: Image marker. Args: longitude, latitude, image, name, scale
-addGlowingPolyline: Glowing line. Args: positions[], name, color, glowPower
-addDashedPolyline: Dashed line. Args: positions[], name, color, dashLength
+=== COORDINATE-BASED CAMERA (only when user gives coordinates) ===
+flyTo: Args: longitude, latitude, height, duration
+zoom: Args: amount (positive=in, negative=out)
+lookAt: Args: longitude, latitude, range
+
+=== COORDINATE-BASED 3D SHAPES (only when user gives coordinates) ===
+addSphere: Args: longitude, latitude, radius, name, color, height
+addBox: Args: longitude, latitude, dimensionX, dimensionY, dimensionZ, name, color
+addCylinder: Args: longitude, latitude, length, topRadius, bottomRadius, name, color
+addSensorCone: Sensor/radar/camera FOV cone (partial ellipsoid). Args: longitude, latitude, radius (range), horizontalAngle (1-360°), verticalAngle (1-180°), heading, pitch, color, opacity, name
+
+=== 2D ENTITIES ===
+addPoint: Args: longitude, latitude, name, color
+addLabel: Args: longitude, latitude, text, color
+addPolyline: Args: positions[], name, color, width
+addPolygon: Args: positions[], name, color
 addArrowPolyline: Arrow line. Args: positions[], name, color, width
 addOutlinedPolyline: Line with outline. Args: positions[], color, outlineColor, outlineWidth
 
@@ -2050,6 +2128,7 @@ LOCATIONS: NYC(-74.006,40.7128) London(-0.1276,51.5074) Paris(2.3522,48.8566) To
 IMPORTANT DISTINCTIONS:
 - sphere/ball → addSphere (3D volume floating above ground)
 - circle → addCircle (flat 2D shape on ground)
+- sensor/radar/camera/FOV/fan/cone segment → addSensorCone (partial ellipsoid for field of view visualization)
 - "fly to Paris" → flyTo (navigate to location)
 - "fly to the marker" → flyToEntity (navigate to existing entity)
 - marker/point/pin → addPoint
@@ -2061,6 +2140,9 @@ EXAMPLES:
 "large 50km red sphere NYC" → {"tool":"addSphere","arguments":{"longitude":-74.006,"latitude":40.7128,"radius":50000,"name":"Sphere","color":"red"}}
 "sphere 10km above DC" → {"tool":"addSphere","arguments":{"longitude":-77.0369,"latitude":38.9072,"radius":5000,"height":10000,"name":"Sphere","color":"red"}}
 "draw circle around Paris" → {"tool":"addCircle","arguments":{"longitude":2.3522,"latitude":48.8566,"radius":10000,"name":"Circle","color":"yellow"}}
+"sensor fan 30 degrees wide 50 tall at Paris" → {"tool":"addSensorConeAtLocation","arguments":{"locationName":"Paris","radius":50000,"horizontalAngle":30,"verticalAngle":50,"color":"lime","opacity":0.5}}
+"add radar cone pointing east" → {"tool":"addSensorCone","arguments":{"longitude":0,"latitude":0,"radius":100000,"horizontalAngle":45,"verticalAngle":30,"heading":90,"color":"cyan","opacity":0.4}}
+"camera FOV visualization" → {"tool":"addSensorCone","arguments":{"longitude":0,"latitude":0,"radius":1000,"horizontalAngle":60,"verticalAngle":40,"color":"yellow","opacity":0.3}}
 "set view instantly to Tokyo" → {"tool":"setView","arguments":{"longitude":139.6917,"latitude":35.6895,"height":500000}}
 "rotate camera 90 degrees right" → {"tool":"rotateCamera","arguments":{"heading":90}}
 "follow the airplane" → {"tool":"trackEntity","arguments":{"entityId":"airplane"}}

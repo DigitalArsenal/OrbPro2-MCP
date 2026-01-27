@@ -424,6 +424,83 @@ export function createCircle(
   return createEllipse(position, radius, radius, options);
 }
 
+/**
+ * Multiply two quaternions: q1 * q2
+ * Quaternions in [x, y, z, w] format
+ */
+function multiplyQuaternions(
+  q1: [number, number, number, number],
+  q2: [number, number, number, number]
+): [number, number, number, number] {
+  const [x1, y1, z1, w1] = q1;
+  const [x2, y2, z2, w2] = q2;
+  return [
+    w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+    w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+    w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+    w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+  ];
+}
+
+/**
+ * Compute the orientation quaternion for an entity at a geographic position with heading.
+ * This transforms from ECEF (Earth-Centered, Earth-Fixed) to the body frame.
+ *
+ * @param longitude - Longitude in degrees
+ * @param latitude - Latitude in degrees
+ * @param headingDegrees - Heading in degrees (0 = North, 90 = East, clockwise positive)
+ * @returns Unit quaternion [x, y, z, w]
+ */
+function computeOrientationQuaternion(
+  longitude: number,
+  latitude: number,
+  headingDegrees: number
+): [number, number, number, number] {
+  // Convert to radians
+  const lon = longitude * Math.PI / 180;
+  const lat = latitude * Math.PI / 180;
+  const heading = headingDegrees * Math.PI / 180;
+
+  // Step 1: Compute quaternion for ENU frame at (lon, lat)
+  // The ENU frame at a point is obtained by rotating from ECEF:
+  // - Rotate around ECEF Z-axis by (longitude + 90°) to align X with East
+  // - Rotate around the new X-axis by (90° - latitude) to align Z with Up
+
+  // Rz(lon + 90°) - rotation around Z axis
+  const lonAngle = (lon + Math.PI / 2) / 2;
+  const qLon: [number, number, number, number] = [
+    0,
+    0,
+    Math.sin(lonAngle),
+    Math.cos(lonAngle),
+  ];
+
+  // Rx(90° - lat) - rotation around X axis
+  const latAngle = (Math.PI / 2 - lat) / 2;
+  const qLat: [number, number, number, number] = [
+    Math.sin(latAngle),
+    0,
+    0,
+    Math.cos(latAngle),
+  ];
+
+  // ENU frame quaternion: Rz * Rx
+  const qENU = multiplyQuaternions(qLon, qLat);
+
+  // Step 2: Compute heading rotation in ENU frame (around local Up/Z axis)
+  // Cesium uses clockwise-positive heading, so we negate
+  const headingAngle = -heading / 2;
+  const qHeading: [number, number, number, number] = [
+    0,
+    0,
+    Math.sin(headingAngle),
+    Math.cos(headingAngle),
+  ];
+
+  // Step 3: Combine: body_from_ECEF = heading_in_ENU * ENU_from_ECEF
+  return multiplyQuaternions(qHeading, qENU);
+}
+
 export function createBox(
   position: CartographicPosition,
   dimensions: { x: number; y: number; z: number },
@@ -431,9 +508,11 @@ export function createBox(
     id?: string;
     name?: string;
     color?: string;
+    /** Heading in degrees (0 = North, 90 = East, 180 = South, 270 = West) */
+    heading?: number;
   }
 ): CZMLPacket {
-  return {
+  const packet: CZMLPacket = {
     id: options?.id || generateId('box'),
     name: options?.name || 'Box',
     position: {
@@ -449,6 +528,19 @@ export function createBox(
       show: true,
     },
   };
+
+  // Add orientation if heading specified
+  if (options?.heading !== undefined) {
+    packet.orientation = {
+      unitQuaternion: computeOrientationQuaternion(
+        position.longitude,
+        position.latitude,
+        options.heading
+      ),
+    };
+  }
+
+  return packet;
 }
 
 export function createEllipsoid(
@@ -499,6 +591,112 @@ export function createSphere(
   }
 ): CZMLPacket {
   return createEllipsoid(position, { x: radius, y: radius, z: radius }, options);
+}
+
+/**
+ * Create a partial ellipsoid (sensor cone/fan) with angular constraints
+ * Uses minimumCone, maximumCone, minimumClock, maximumClock to define the shape
+ *
+ * @param position Center position of the sensor
+ * @param options Sensor cone options
+ * @returns CZML packet for the sensor cone
+ */
+export function createSensorCone(
+  position: CartographicPosition,
+  options: {
+    id?: string;
+    name?: string;
+    radius: number;           // Length of the sensor cone in meters
+    innerRadius?: number;     // Inner radius (for hollow cones), default 0
+    horizontalAngle: number;  // Horizontal width in degrees (azimuth span)
+    verticalAngle: number;    // Vertical height in degrees (elevation span)
+    heading?: number;         // Direction sensor points in degrees (0=North, 90=East)
+    pitch?: number;           // Pitch angle in degrees (0=horizontal, -90=down)
+    color?: string;
+    opacity?: number;         // 0-1, default 0.5
+    fill?: boolean;
+    outline?: boolean;
+    outlineColor?: string;
+    stackPartitions?: number;
+    slicePartitions?: number;
+  }
+): CZMLPacket {
+  // Convert angles to radians
+  const halfHorizRad = (options.horizontalAngle / 2) * (Math.PI / 180);
+  const vertRad = options.verticalAngle * (Math.PI / 180);
+  const headingRad = (options.heading || 0) * (Math.PI / 180);
+  const pitchRad = (options.pitch || 0) * (Math.PI / 180);
+
+  // Clock angles (horizontal slice) - centered around the heading direction
+  const minimumClock = -halfHorizRad;
+  const maximumClock = halfHorizRad;
+
+  // Cone angles (vertical slice) - from top of cone to specified angle
+  // In Cesium, cone angle 0 is along +Z, PI/2 is horizontal
+  const minimumCone = 0;
+  const maximumCone = vertRad;
+
+  // Calculate opacity (0-255)
+  const alpha = Math.round((options.opacity ?? 0.5) * 255);
+  const color = createColorFromName(options.color || 'lime');
+  if (color.rgba) {
+    color.rgba[3] = alpha;
+  }
+
+  // Build orientation quaternion from heading and pitch
+  // Using Cesium's convention: heading rotates around Z, pitch around Y
+  const orientation = calculateOrientation(headingRad, pitchRad);
+
+  return {
+    id: options.id || generateId('sensorCone'),
+    name: options.name || 'Sensor Cone',
+    position: {
+      cartographicDegrees: positionToCartographicDegrees(position),
+    },
+    orientation: {
+      unitQuaternion: orientation,
+    },
+    ellipsoid: {
+      radii: { cartesian: [options.radius, options.radius, options.radius] },
+      innerRadii: options.innerRadius
+        ? { cartesian: [options.innerRadius, options.innerRadius, options.innerRadius] }
+        : undefined,
+      minimumClock,
+      maximumClock,
+      minimumCone,
+      maximumCone,
+      fill: options.fill ?? true,
+      material: createSolidColorMaterial(color),
+      outline: options.outline ?? true,
+      outlineColor: createColorFromName(options.outlineColor || 'white'),
+      stackPartitions: options.stackPartitions || 32,
+      slicePartitions: options.slicePartitions || 32,
+      show: true,
+    },
+  };
+}
+
+/**
+ * Calculate orientation quaternion from heading and pitch angles
+ * @param heading Heading in radians (0 = North, PI/2 = East)
+ * @param pitch Pitch in radians (0 = horizontal, -PI/2 = down)
+ * @returns Unit quaternion [x, y, z, w]
+ */
+function calculateOrientation(heading: number, pitch: number): [number, number, number, number] {
+  // Convert heading/pitch to quaternion
+  // Heading rotation around Z-axis, then pitch around Y-axis
+  const cosH = Math.cos(heading / 2);
+  const sinH = Math.sin(heading / 2);
+  const cosP = Math.cos(pitch / 2);
+  const sinP = Math.sin(pitch / 2);
+
+  // Combine rotations: first heading (around Z), then pitch (around Y)
+  return [
+    sinH * cosP,
+    cosH * sinP,
+    sinH * sinP,
+    cosH * cosP,
+  ];
 }
 
 export function createCylinder(

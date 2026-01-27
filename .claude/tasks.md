@@ -1,408 +1,176 @@
-# Cesium SLM - Complete Training Pipeline
+# Cesium SLM - Architecture & Development Tasks
 
-Run: `claude --dangerously-skip-permissions "Execute all tasks in .claude/tasks.md sequentially"`
-
-This pipeline builds comprehensive training data from Cesium documentation and trains a fine-tuned model.
+This document tracks the architectural improvements and development tasks for the Cesium Small Language Model project.
 
 ---
 
-## TASK 1: Clone Cesium Repository
+## Current Architecture
 
-Clone the official CesiumJS repository to access full documentation source.
+- **WASM MCP Server**: C++ MCP server compiled to WebAssembly
+- **Location Database**: 56K+ locations compiled into WASM (inefficient)
+- **LLM Support**: WebLLM (browser) + API providers (Ollama, OpenAI, etc.)
+- **Protocol**: JSON-RPC 2.0 over MCP
 
-```bash
-cd /Users/tj/software && \
-if [ ! -d "cesium-docs" ]; then
-  git clone --depth 1 https://github.com/CesiumGS/cesium.git cesium-docs
-else
-  echo "Cesium repo already cloned"
-fi
+---
+
+## PRIORITY 1: Binary Location Database
+
+### Completed
+- [x] Designed binary database format (header + fixed-size records + string table)
+- [x] Created build script skeleton (`scripts/build-binary-locations.mjs`)
+- [x] Added all 50 US states + DC + territories with aliases
+
+### In Progress
+- [ ] Fetch US Census cities (population > 1000) with coordinates
+- [ ] Integrate SimpleMaps or GeoNames dataset for city coordinates
+- [ ] Update C++ to load binary database at runtime (separate from WASM)
+
+### Binary Format Spec
+```
+Header (64 bytes):
+  Magic: "LOCDB001" (8 bytes)
+  Version: uint32
+  Flags: uint32
+  Location count: uint32
+  Record size: uint32
+  String table offset: uint64
+  String table size: uint64
+  Reserved: 24 bytes
+
+Location Record (28 bytes):
+  Name offset: uint32
+  Name length: uint16
+  Type flags: uint16
+  Longitude: float32
+  Latitude: float32
+  Heading: float32
+  Population: uint32
+  Reserved: uint32
 ```
 
 ---
 
-## TASK 2: Install Cesium Dependencies
+## PRIORITY 2: Camera-Aware "Here" Tools
 
-Install Node.js dependencies required to build Cesium documentation.
+### Completed
+- [x] Added camera state tracking to C++ WASM (`setCameraState`, `getCameraTarget`)
+- [x] Added `addSphereHere`, `addBoxHere`, `addPointHere`, `addLabelHere`, `addCylinderHere`
+- [x] Added `addCircleHere`, `addModelHere`, `addPolygonHere`
+- [x] Added `addEntityHere` (generic tool routing to appropriate type)
 
+### To Do
+- [ ] Wire up camera state updates from Cesium viewer to WASM
+- [ ] Add `addPolylineHere` (with configurable length/direction)
+- [ ] Add `addRectangleHere` (with configurable size)
+
+---
+
+## PRIORITY 3: Replace JSON with FlatBuffers
+
+Replace JSON-RPC with aligned binary protocol using FlatBuffers for better performance.
+
+### Tasks
+- [ ] Define FlatBuffer schemas for MCP protocol
+  - Tool definitions schema
+  - Tool call request/response schema
+  - Camera state schema
+  - Entity command schema
+- [ ] Compile schemas with `flatc-wasm`
+- [ ] Update C++ MCP server to use FlatBuffers
+- [ ] Update TypeScript wrapper for FlatBuffer serialization
+- [ ] Add schema version negotiation
+
+### Benefits
+- Zero-copy deserialization
+- Smaller message sizes
+- Faster parsing
+- Schema evolution support
+
+---
+
+## PRIORITY 4: Comprehensive City Database
+
+### Data Sources (choose one or combine)
+1. **US Census Bureau API** - Population data (no coordinates)
+2. **SimpleMaps US Cities** - Free dataset with coordinates
+3. **GeoNames** - Global cities with population thresholds
+4. **OpenStreetMap/Nominatim** - Open data
+
+### Requirements
+- All US cities > 1000 population (~10,000 cities)
+- Major international cities (~5,000)
+- Key landmarks and POIs (~2,000)
+- Total target: ~75,000 entries
+
+### Build Pipeline
 ```bash
-cd /Users/tj/software/cesium-docs && \
-npm install --legacy-peer-deps
+# Fetch data
+npm run fetch:census     # US population data
+npm run fetch:geonames   # City coordinates
+
+# Merge and deduplicate
+npm run build:locations
+
+# Generate binary database
+npm run build:location-db
 ```
 
 ---
 
-## TASK 3: Build Cesium TypeScript Declarations
+## PRIORITY 5: Model Fine-Tuning Pipeline
 
-Build the TypeScript type definitions which contain comprehensive API documentation.
+### Completed
+- [x] Basic training data generator
+- [x] LoRA fine-tuning script
+- [x] MLX export for Apple Silicon
+
+### To Do
+- [ ] Update training data with new "Here" tools
+- [ ] Add FlatBuffer tool definitions to training data
+- [ ] Train 1.5B and 3B parameter variants
+- [ ] Evaluate on compound command test suite
+
+---
+
+## Quick Commands
 
 ```bash
-cd /Users/tj/software/cesium-docs && \
-npm run build-ts 2>/dev/null || echo "TypeScript build completed (some warnings expected)"
+# Development
+npm run dev                 # Start dev server (auto-rebuilds WASM)
+npm run build:wasm          # Build WASM only
+
+# Database
+npm run build:location-db   # Build binary location database
+
+# Training
+npm run train:generate      # Generate training data
+npm run train:finetune      # Run LoRA fine-tuning
 ```
 
 ---
 
-## TASK 4: Generate Cesium Documentation
+## File Structure
 
-Build the full API documentation from JSDoc comments.
-
-```bash
-cd /Users/tj/software/cesium-docs && \
-npm run build-docs 2>/dev/null || npm run generateDocumentation 2>/dev/null || echo "Documentation build attempted"
 ```
+packages/
+  mcp-server-cpp/           # C++/WASM MCP server
+    src/
+      mcp_server.cpp        # Main server logic
+      location_database.cpp # Location lookup (to be replaced)
+    include/
+      location_db_format.h  # Binary format definitions
+    data/
+      locations.bin         # Binary location database
 
----
+scripts/
+  build-binary-locations.mjs  # Binary database builder
+  fetch-census-data.mjs       # Census API fetcher
+  fetch-geonames.mjs          # GeoNames fetcher
 
-## TASK 5: Extract Documentation for Training Data
-
-Parse the Cesium documentation and extract relevant API information for training data generation.
-Create a script to parse the built documentation.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-cat > extract-cesium-docs.ts << 'EOF'
-/**
- * Extract Cesium Documentation for Training Data
- * Parses Cesium TypeScript definitions and JSDoc to generate training examples
- */
-
-import * as fs from 'fs';
-import * as path from 'path';
-
-interface APIExample {
-  className: string;
-  methodName: string;
-  description: string;
-  parameters: { name: string; type: string; description: string }[];
-  returnType: string;
-  example?: string;
-}
-
-const CESIUM_SOURCE = '/Users/tj/software/cesium-docs';
-const OUTPUT_FILE = path.join(__dirname, 'cesium-api-examples.json');
-
-// Key classes to extract for training data
-const TARGET_CLASSES = [
-  'Camera', 'Scene', 'Viewer', 'Entity', 'EntityCollection',
-  'Globe', 'Terrain', 'ImageryLayer', 'ImageryLayerCollection',
-  'Cesium3DTileset', 'Cesium3DTileStyle',
-  'Cartesian3', 'Cartographic', 'Matrix4', 'Quaternion',
-  'Clock', 'JulianDate', 'TimeInterval',
-  'Billboard', 'BillboardCollection', 'Label', 'LabelCollection',
-  'Polyline', 'PolylineCollection', 'Polygon',
-  'Ellipsoid', 'Rectangle', 'BoundingSphere',
-  'CzmlDataSource', 'GeoJsonDataSource', 'KmlDataSource',
-  'ScreenSpaceCameraController', 'CameraEventAggregator',
-  'PostProcessStage', 'PostProcessStageLibrary',
-  'ParticleSystem', 'Fog', 'ShadowMap', 'SkyBox', 'SkyAtmosphere'
-];
-
-// Extract from TypeScript declaration files
-function extractFromDTS(): APIExample[] {
-  const examples: APIExample[] = [];
-  const dtsPath = path.join(CESIUM_SOURCE, 'Build', 'Cesium', 'Cesium.d.ts');
-
-  if (!fs.existsSync(dtsPath)) {
-    console.log('DTS file not found, trying source files...');
-    return extractFromSource();
-  }
-
-  const content = fs.readFileSync(dtsPath, 'utf-8');
-
-  for (const className of TARGET_CLASSES) {
-    const classRegex = new RegExp(`class ${className}[^{]*\\{([^}]+(?:\\{[^}]*\\}[^}]*)*)\\}`, 'g');
-    let match;
-    while ((match = classRegex.exec(content)) !== null) {
-      const classBody = match[1];
-
-      // Extract methods
-      const methodRegex = /(\w+)\s*\(([^)]*)\)\s*:\s*([^;]+)/g;
-      let methodMatch;
-      while ((methodMatch = methodRegex.exec(classBody)) !== null) {
-        examples.push({
-          className,
-          methodName: methodMatch[1],
-          description: `${className}.${methodMatch[1]} method`,
-          parameters: parseParams(methodMatch[2]),
-          returnType: methodMatch[3].trim()
-        });
-      }
-    }
-  }
-
-  return examples;
-}
-
-// Extract from source files
-function extractFromSource(): APIExample[] {
-  const examples: APIExample[] = [];
-  const sourcePath = path.join(CESIUM_SOURCE, 'packages', 'engine', 'Source');
-
-  if (!fs.existsSync(sourcePath)) {
-    console.log('Source path not found:', sourcePath);
-    return examples;
-  }
-
-  function processDir(dir: string) {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-      const fullPath = path.join(dir, file);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        processDir(fullPath);
-      } else if (file.endsWith('.js') || file.endsWith('.ts')) {
-        try {
-          const content = fs.readFileSync(fullPath, 'utf-8');
-
-          // Extract JSDoc comments with examples
-          const jsdocRegex = /\/\*\*[\s\S]*?\*\//g;
-          let match;
-          while ((match = jsdocRegex.exec(content)) !== null) {
-            const jsdoc = match[0];
-            if (jsdoc.includes('@example')) {
-              const exampleMatch = jsdoc.match(/@example[\s\S]*?(?=@|\*\/)/);
-              if (exampleMatch) {
-                const funcMatch = content.slice(match.index + match[0].length, match.index + match[0].length + 500)
-                  .match(/(?:function\s+)?(\w+)\s*[=(]/);
-                if (funcMatch) {
-                  examples.push({
-                    className: path.basename(file, path.extname(file)),
-                    methodName: funcMatch[1],
-                    description: extractDescription(jsdoc),
-                    parameters: [],
-                    returnType: 'unknown',
-                    example: exampleMatch[0].replace(/@example\s*/, '').trim()
-                  });
-                }
-              }
-            }
-          }
-        } catch (e) {
-          // Skip files that can't be read
-        }
-      }
-    }
-  }
-
-  processDir(sourcePath);
-  return examples;
-}
-
-function parseParams(paramStr: string): { name: string; type: string; description: string }[] {
-  if (!paramStr.trim()) return [];
-  return paramStr.split(',').map(p => {
-    const parts = p.trim().split(':');
-    return {
-      name: parts[0]?.replace('?', '').trim() || '',
-      type: parts[1]?.trim() || 'any',
-      description: ''
-    };
-  }).filter(p => p.name);
-}
-
-function extractDescription(jsdoc: string): string {
-  const descMatch = jsdoc.match(/\/\*\*\s*\n?\s*\*?\s*([^@*][^\n]*)/);
-  return descMatch ? descMatch[1].trim() : '';
-}
-
-// Main
-const allExamples = [...extractFromDTS(), ...extractFromSource()];
-console.log(`Extracted ${allExamples.length} API examples`);
-
-fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allExamples, null, 2));
-console.log(`Saved to ${OUTPUT_FILE}`);
-EOF
+src/
+  mcp/
+    wasm-mcp-server.ts      # WASM wrapper
+  llm/
+    api-llm-engine.ts       # API-based LLM inference
+    web-llm-engine.ts       # Browser-based inference
 ```
-
----
-
-## TASK 6: Run Documentation Extraction
-
-Execute the documentation extraction script.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-npx tsx extract-cesium-docs.ts || echo "Extraction completed with warnings"
-```
-
----
-
-## TASK 7: Add Cesium Doc Generator to Training Data Generator
-
-Update the training data generator to use the Cesium documentation examples.
-Add the generateCesiumDocExample function to the generators list.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-# Find the line with "// Astrodynamics examples" and add the Cesium doc generator before it
-sed -i.bak 's/\/\/ Astrodynamics examples (orbital mechanics, RIC frames, covariance)/\/\/ Cesium documentation examples (API terminology, proper method names)\n    { fn: generateCesiumDocExample, weight: 12 },\n\n    \/\/ Astrodynamics examples (orbital mechanics, RIC frames, covariance)/' generate-training-data.ts
-```
-
----
-
-## TASK 8: Generate Comprehensive Training Data
-
-Generate 150K+ training examples with:
-- All 80+ CesiumJS MCP tools
-- Balanced distribution across tools
-- Astrodynamics terminology (radial, in-track, cross-track, RIC, LVLH)
-- Cesium documentation terminology (heading, pitch, roll, Cartographic, etc.)
-- Compound commands (multi-step requests)
-- Conversational follow-ups
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-npx tsx generate-training-data.ts
-```
-
----
-
-## TASK 9: Verify Training Data Quality
-
-Check the distribution of generated training data.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-echo "=== Training Data Statistics ===" && \
-wc -l generated-training-data.jsonl && \
-echo "" && \
-echo "=== Tool Distribution (top 20) ===" && \
-cat generated-training-data.jsonl | jq -r '.output' | jq -r '.tool' 2>/dev/null | sort | uniq -c | sort -rn | head -20 && \
-echo "" && \
-echo "=== Sample Examples ===" && \
-head -5 generated-training-data.jsonl | jq '.'
-```
-
----
-
-## TASK 10: Verify Python Dependencies
-
-Install/verify Python dependencies for fine-tuning.
-
-```bash
-pip3 install torch transformers peft datasets accelerate bitsandbytes --upgrade --quiet
-```
-
----
-
-## TASK 11: Run Fine-Tuning with LoRA
-
-Fine-tune Qwen2.5-0.5B-Instruct on the generated training data.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-python3 finetune_lora.py \
-  --model_name "Qwen/Qwen2.5-0.5B-Instruct" \
-  --dataset "./generated-training-data.jsonl" \
-  --output_dir "./cesium-qwen-lora" \
-  --num_epochs 3 \
-  --batch_size 4 \
-  --learning_rate 2e-5 \
-  --lora_r 32 \
-  --lora_alpha 64 \
-  --max_length 512
-```
-
----
-
-## TASK 12: Merge LoRA Weights
-
-Merge the LoRA adapter weights into the base model.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-python3 -c "
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
-import torch
-
-base_model = AutoModelForCausalLM.from_pretrained('Qwen/Qwen2.5-0.5B-Instruct', torch_dtype=torch.float16)
-model = PeftModel.from_pretrained(base_model, './cesium-qwen-lora')
-merged = model.merge_and_unload()
-merged.save_pretrained('./cesium-qwen-lora/merged')
-
-tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2.5-0.5B-Instruct')
-tokenizer.save_pretrained('./cesium-qwen-lora/merged')
-print('Model merged and saved to ./cesium-qwen-lora/merged')
-"
-```
-
----
-
-## TASK 13: Verify Output
-
-Verify the fine-tuned model was created successfully.
-
-```bash
-echo "=== Fine-tuned Model Files ===" && \
-ls -la /Users/tj/software/OrbPro-Small-Language-Model/training/cesium-qwen-lora/ && \
-echo "" && \
-echo "=== Merged Model Files ===" && \
-ls -la /Users/tj/software/OrbPro-Small-Language-Model/training/cesium-qwen-lora/merged/ 2>/dev/null || echo "Merged model not yet created"
-```
-
----
-
-## TASK 14: Test Model Inference
-
-Quick test of the fine-tuned model.
-
-```bash
-cd /Users/tj/software/OrbPro-Small-Language-Model/training && \
-python3 -c "
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-
-model_path = './cesium-qwen-lora/merged'
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16)
-
-test_prompts = [
-    'Fly to Paris',
-    'Add a red sphere at New York',
-    'Set camera heading to 45 degrees',
-    'Add covariance ellipsoid 10km radial 20km in-track 5km cross-track',
-    'Switch to 2D mode'
-]
-
-for prompt in test_prompts:
-    inputs = tokenizer(prompt, return_tensors='pt')
-    outputs = model.generate(**inputs, max_new_tokens=100, temperature=0.1)
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    print(f'Prompt: {prompt}')
-    print(f'Response: {response}')
-    print('---')
-"
-```
-
----
-
-## TASK 15: Export for WebLLM (Optional)
-
-Convert the model to MLC format for browser deployment.
-
-```bash
-echo "To export for WebLLM/MLC, run:"
-echo "pip install mlc-llm"
-echo "mlc_llm convert --model ./cesium-qwen-lora/merged --output ./cesium-slm-mlc"
-echo ""
-echo "See training/finetune/export_mlc.py for detailed export instructions"
-```
-
----
-
-## Summary
-
-Training pipeline complete. Files created:
-- `training/cesium-api-examples.json` - Extracted Cesium API documentation
-- `training/generated-training-data.jsonl` - 150K+ training examples
-- `training/cesium-qwen-lora/` - LoRA adapter weights
-- `training/cesium-qwen-lora/merged/` - Merged fine-tuned model
-
-The fine-tuned model includes:
-- 80+ CesiumJS MCP tools
-- Astrodynamics terminology (RIC, LVLH, radial, in-track, cross-track)
-- Cesium API terminology (heading, pitch, roll, Cartographic, etc.)
-- Multi-step compound commands
-- Conversational follow-ups

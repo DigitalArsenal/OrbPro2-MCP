@@ -1,0 +1,38 @@
+// Location Database FlatBuffer Schema
+// Compile with: flatc --cpp --gen-object-api locations.fbs
+
+namespace cesium.mcp;
+
+// Type flags for locations
+enum LocationType : ushort {
+  Unknown = 0,
+  State = 1,
+  City = 2,
+  Landmark = 4,
+  Country = 8,
+  Region = 16,
+  Airport = 32
+}
+
+// Single location entry
+table Location {
+  name: string (required);           // Normalized name (lowercase, no punctuation)
+  longitude: float;                   // Degrees (-180 to 180)
+  latitude: float;                    // Degrees (-90 to 90)
+  heading: float = -1.0;              // Heading in degrees (0-360), -1 if not set
+  population: uint32 = 0;             // Population (0 if unknown)
+  type: LocationType = Unknown;       // Location type
+  aliases: [string];                  // Alternative names
+}
+
+// Root table containing all locations
+table LocationDatabase {
+  version: uint32 = 1;
+  locations: [Location];
+  // String interning for common prefixes
+  string_pool: [string];
+}
+
+root_type LocationDatabase;
+file_identifier "LOCS";
+file_extension "locbin";

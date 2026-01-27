@@ -13,6 +13,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@mlc-ai/web-llm'],
+    // Exclude packages directory (contains emsdk)
+    entries: ['src/**/*.ts', 'src/**/*.tsx', '!packages/**'],
   },
   define: {
     CESIUM_BASE_URL: JSON.stringify('/Cesium'),
@@ -27,6 +29,10 @@ export default defineConfig({
       // Allow serving files from symlinked model directory
       allow: ['.', 'mlc-models'],
       strict: false,
+    },
+    watch: {
+      // Ignore packages directory (contains emsdk, build artifacts)
+      ignored: ['**/packages/**', '**/node_modules/**'],
     },
   },
 });

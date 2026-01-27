@@ -16,6 +16,7 @@ struct Location {
   const char* name;
   double longitude;
   double latitude;
+  double heading;  // Orientation in degrees (0=North, 90=East), -1 = not set
 };
 
 /**
@@ -23,9 +24,10 @@ struct Location {
  * @param name Location name (case-insensitive)
  * @param longitude Output: longitude in degrees
  * @param latitude Output: latitude in degrees
+ * @param heading Output: heading in degrees (0=North, 90=East), -1 if not set
  * @return true if location found, false otherwise
  */
-bool resolve_location(const char* name, double& longitude, double& latitude);
+bool resolve_location(const char* name, double& longitude, double& latitude, double& heading);
 
 /**
  * Get all known locations
@@ -55,6 +57,49 @@ size_t search_locations(const char* prefix, const Location** results, size_t max
  * @param output_size Size of output buffer
  */
 void normalize_location_name(const char* input, char* output, size_t output_size);
+
+/**
+ * Fuzzy search for a location name using Levenshtein distance
+ * Efficiently finds close matches when exact matching fails
+ * @param name Location name to search for (case-insensitive)
+ * @param longitude Output: longitude in degrees (if found)
+ * @param latitude Output: latitude in degrees (if found)
+ * @param heading Output: heading in degrees (if found)
+ * @param max_distance Maximum edit distance to consider a match (default: 3)
+ * @return true if a close match found, false otherwise
+ */
+bool fuzzy_resolve_location(const char* name, double& longitude, double& latitude,
+                            double& heading, int max_distance = 3);
+
+/**
+ * Fuzzy search returning multiple candidates with scores
+ * @param name Location name to search for
+ * @param results Output array of matching locations
+ * @param scores Output array of match scores (lower = better match)
+ * @param max_results Maximum number of results to return
+ * @param max_distance Maximum edit distance to consider
+ * @return Number of matches found
+ */
+size_t fuzzy_search_locations(const char* name, const Location** results,
+                              int* scores, size_t max_results, int max_distance = 3);
+
+/**
+ * Calculate Levenshtein edit distance between two strings
+ * Uses early termination when distance exceeds threshold for efficiency
+ * @param s1 First string
+ * @param s2 Second string
+ * @param max_distance Maximum distance before early termination (-1 = no limit)
+ * @return Edit distance, or max_distance+1 if exceeded threshold
+ */
+int levenshtein_distance(const char* s1, const char* s2, int max_distance = -1);
+
+/**
+ * Check if string contains another string (substring match)
+ * @param haystack String to search in
+ * @param needle String to search for
+ * @return true if needle is found in haystack
+ */
+bool contains_substring(const char* haystack, const char* needle);
 
 }  // namespace mcp
 }  // namespace cesium

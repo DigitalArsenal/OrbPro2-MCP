@@ -3,7 +3,7 @@
  * Integrates with web-llm for running small language models in the browser
  */
 
-import type { MLCEngine, ChatCompletionMessageParam } from '@mlc-ai/web-llm';
+import type { MLCEngine, WebWorkerMLCEngine, ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { buildSystemPrompt, buildCompactSystemPrompt } from './prompts';
 
 export interface LLMConfig {
@@ -51,31 +51,36 @@ export interface ToolCall {
 
 // Recommended models for CesiumJS control tasks
 export const RECOMMENDED_MODELS = {
-  // Our fine-tuned 1.5B model - trained on 88K Cesium command examples
+  // Best models for function calling (recommended)
+  recommended: [
+    'Llama-3.2-3B-Instruct-q4f16_1-MLC',  // Best function calling at 3B size (~2GB)
+    'Hermes-3-Llama-3.2-3B-q4f16_1-MLC',  // Fine-tuned for tool use (~2GB)
+  ],
+  // Our fine-tuned model - trained on Cesium command examples
   trained: [
     'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC', // Custom trained 1.5B (851MB)
   ],
-  // Fallback to base HuggingFace model
+  // Fallback to Llama for function calling
   fallback: [
-    'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', // Base HuggingFace model
+    'Llama-3.2-3B-Instruct-q4f16_1-MLC',
   ],
-  // Smaller, faster models - optimized for function calling
+  // Smaller, faster models (less accurate for function calling)
   small: [
     'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
-    'SmolLM2-360M-Instruct-q4f16_1-MLC',
     'SmolLM2-1.7B-Instruct-q4f16_1-MLC',
+    'SmolLM2-360M-Instruct-q4f16_1-MLC',
   ],
   // Medium models with better reasoning
   medium: [
-    'Qwen2.5-3B-Instruct-q4f16_1-MLC',
     'Phi-3.5-mini-instruct-q4f16_1-MLC',
+    'Qwen2.5-3B-Instruct-q4f16_1-MLC',
     'gemma-2-2b-it-q4f16_1-MLC',
   ],
   // Larger models for complex tasks
   large: [
-    'Llama-3.2-3B-Instruct-q4f16_1-MLC',
     'Qwen2.5-7B-Instruct-q4f16_1-MLC',
     'Mistral-7B-Instruct-v0.3-q4f16_1-MLC',
+    'Llama-3.1-8B-Instruct-q4f16_1-MLC',
   ],
   // Custom/self-compiled models (add your own after compilation)
   custom: [] as string[],
@@ -123,7 +128,7 @@ export function getCustomModelId(): string | null {
 }
 
 export class WebLLMEngine {
-  private engine: MLCEngine | null = null;
+  private engine: MLCEngine | WebWorkerMLCEngine | null = null;
   private config: LLMConfig;
   private isInitialized: boolean = false;
   private tools: ToolDefinition[] = [];
@@ -224,6 +229,7 @@ export class WebLLMEngine {
       );
     } else {
       // Load standard WebLLM model
+      console.log('[WebLLM] Creating MLC Engine...');
       this.engine = await webllm.CreateMLCEngine(
         this.config.modelId,
         {

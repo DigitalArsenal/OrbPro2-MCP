@@ -61,12 +61,16 @@ echo ""
 echo "Building..."
 emmake make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
+# Copy outputs to dist/
+DIST_DIR="${PROJECT_DIR}/dist"
+mkdir -p "${DIST_DIR}"
+cp "${BUILD_DIR}/cesium-mcp-wasm.js" "${DIST_DIR}/"
+cp "${BUILD_DIR}/cesium-mcp-wasm.wasm" "${DIST_DIR}/"
+
 echo ""
 echo "============================================"
 echo "Build complete!"
 echo "============================================"
 echo ""
 echo "Output files:"
-ls -la "${PROJECT_DIR}/dist/"*.js "${PROJECT_DIR}/dist/"*.wasm 2>/dev/null || \
-ls -la "${BUILD_DIR}/"*.js "${BUILD_DIR}/"*.wasm 2>/dev/null || \
-echo "  (check build directory for output)"
+ls -la "${DIST_DIR}/cesium-mcp-wasm.js" "${DIST_DIR}/cesium-mcp-wasm.wasm"

@@ -4,19 +4,23 @@
   "description": "Browser-based Small Language Model for controlling CesiumJS via natural language",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "npm run build:wasm && vite",
+    "build": "npm run build:wasm && tsc && vite build",
+    "build:wasm": "cd packages/mcp-server-cpp && ./scripts/build-wasm.sh",
     "preview": "vite preview",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.tsx",
     "asbuild:debug": "asc wasm/assembly/index.ts --target debug --outFile wasm/build/mcp.debug.wasm --textFile wasm/build/mcp.debug.wat --exportRuntime --sourceMap",
     "asbuild:release": "asc wasm/assembly/index.ts --target release --outFile wasm/build/mcp.wasm --textFile wasm/build/mcp.wat --exportRuntime --optimize",
-    "asbuild": "npm run asbuild:debug && npm run asbuild:release"
+    "asbuild": "npm run asbuild:debug && npm run asbuild:release",
+    "build:locations": "node scripts/build-location-database.mjs",
+    "merge:locations": "node scripts/merge-location-databases.mjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.78",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "cesium": "^1.124.0",
+    "compromise": "^14.14.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

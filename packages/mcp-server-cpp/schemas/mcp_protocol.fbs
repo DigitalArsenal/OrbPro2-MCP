@@ -127,6 +127,35 @@ table AddCircleArgs {
   color: string;
 }
 
+table AddSensorConeArgs {
+  longitude: double;
+  latitude: double;
+  height: double = 0;
+  radius: double;               // Range/length of the sensor cone in meters
+  horizontal_angle: double;     // Horizontal FOV in degrees (1-360)
+  vertical_angle: double;       // Vertical FOV in degrees (1-180)
+  heading: double = 0;          // Direction: 0=North, 90=East
+  pitch: double = 0;            // Tilt: -90=down, 0=horizontal
+  inner_radius: double = 0;     // Inner radius for hollow cone
+  name: string;
+  color: string;
+  opacity: double = 0.5;
+}
+
+table AddSensorConeAtLocationArgs {
+  location: string;
+  radius: double;
+  horizontal_angle: double;
+  vertical_angle: double;
+  heading: double = 0;
+  pitch: double = 0;
+  inner_radius: double = 0;
+  name: string;
+  color: string;
+  opacity: double = 0.5;
+  height: double = 0;
+}
+
 table RemoveEntityArgs {
   id: string;
 }
@@ -185,6 +214,7 @@ union ToolArgs {
   AddPolylineArgs,
   AddPolygonArgs,
   AddCircleArgs,
+  AddSensorConeArgs,
   RemoveEntityArgs,
   ClearAllArgs,
   SetSceneModeArgs,
@@ -192,7 +222,8 @@ union ToolArgs {
   ResolveLocationArgs,
   FlyToLocationArgs,
   AddSphereAtLocationArgs,
-  AddBoxAtLocationArgs
+  AddBoxAtLocationArgs,
+  AddSensorConeAtLocationArgs
 }
 
 // ============================================================================

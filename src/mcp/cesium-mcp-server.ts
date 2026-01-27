@@ -8,6 +8,7 @@ import type { BrowserTransport, MCPMessage } from './browser-transport';
 import type { CesiumCommand, CartographicPosition, CZMLPacket } from '../cesium/types';
 import * as czmlGenerator from '../cesium/czml-generator';
 import { KNOWN_LOCATIONS } from '../llm/command-parser';
+import type { CanvasAnalyzer, LLMProvider } from '../vision/canvas-analyzer';
 
 /**
  * Resolve a location name to coordinates using the built-in database.
@@ -32,9 +33,90 @@ const colorSchema = z.enum([
 
 // Tool definitions
 const tools = {
+  // Location-aware tools that accept place names (PREFERRED - use these!)
+  resolveLocation: {
+    name: 'resolveLocation',
+    description: 'Look up coordinates for a place name. Returns longitude, latitude, and suggested viewing height. You can provide fallback coordinates if you know them - they will be used if the location is not in the database.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place (e.g., "Paris", "Statue of Liberty", "CERN", "the big apple")'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database (e.g., 22.8905 for Cabo San Lucas)'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database (e.g., -109.9167 for Cabo San Lucas)'),
+    }),
+  },
+  flyToLocation: {
+    name: 'flyToLocation',
+    description: 'Fly the camera to a named location. PREFERRED over flyTo - automatically resolves place names to coordinates. Provide fallback lat/lon if you know the coordinates.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place to fly to (e.g., "Paris", "Golden Gate Bridge", "CERN")'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database'),
+      height: z.number().positive().optional().describe('Camera height in meters (default: 15000 for city view, 500 for landmarks)'),
+      duration: z.number().positive().optional().describe('Flight duration in seconds (default: 3)'),
+    }),
+  },
+  addSphereAtLocation: {
+    name: 'addSphereAtLocation',
+    description: 'Add a 3D sphere at a named location. PREFERRED over addSphere - automatically resolves place names. Provide fallback lat/lon if you know the coordinates.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place (e.g., "Paris", "CERN", "Golden Gate Bridge")'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database'),
+      radius: z.number().positive().describe('Sphere radius in meters'),
+      color: colorSchema.optional().describe('Sphere color (default: blue)'),
+      name: z.string().optional().describe('Label for the sphere'),
+      height: z.number().optional().describe('Height offset above ground in meters (default: radius)'),
+    }),
+  },
+  addPointAtLocation: {
+    name: 'addPointAtLocation',
+    description: 'Add a point marker at a named location. PREFERRED over addPoint - automatically resolves place names. Provide fallback lat/lon if you know the coordinates.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database'),
+      name: z.string().optional().describe('Label for the point'),
+      color: colorSchema.optional().describe('Point color (default: yellow)'),
+      size: z.number().positive().optional().describe('Point size in pixels (default: 10)'),
+    }),
+  },
+  addBoxAtLocation: {
+    name: 'addBoxAtLocation',
+    description: 'Add a 3D box at a named location. PREFERRED over addBox. Use heading to rotate and align with structures (bridges run along their length, buildings face streets). Provide fallback lat/lon if you know the coordinates.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database'),
+      dimensionX: z.number().positive().describe('Width in meters (perpendicular to heading)'),
+      dimensionY: z.number().positive().describe('Length in meters (along heading direction)'),
+      dimensionZ: z.number().positive().describe('Height in meters (vertical)'),
+      name: z.string().optional().describe('Label for the box'),
+      color: colorSchema.optional().describe('Box color (default: blue)'),
+      heading: z.number().optional().describe('Rotation in degrees: 0=North, 90=East, 180=South, 270=West. Golden Gate Bridge~28°, Brooklyn Bridge~45°'),
+    }),
+  },
+  addSensorConeAtLocation: {
+    name: 'addSensorConeAtLocation',
+    description: 'Add a sensor cone/fan/radar/camera FOV visualization at a named location. PREFERRED over addSensorCone. Perfect for visualizing field of view, detection zones, radar cones.',
+    inputSchema: z.object({
+      locationName: z.string().describe('Name of the place (e.g., "Paris", "London", "CERN")'),
+      latitude: z.number().min(-90).max(90).optional().describe('Fallback latitude if location not in database'),
+      longitude: z.number().min(-180).max(180).optional().describe('Fallback longitude if location not in database'),
+      radius: z.number().positive().describe('Length/range of the sensor cone in meters'),
+      horizontalAngle: z.number().min(1).max(360).describe('Horizontal field of view in degrees (width of the fan)'),
+      verticalAngle: z.number().min(1).max(180).describe('Vertical field of view in degrees (height of the fan)'),
+      heading: z.number().optional().describe('Direction sensor points in degrees (0=North, 90=East, default: 0)'),
+      pitch: z.number().min(-90).max(90).optional().describe('Pitch angle in degrees (0=horizontal, -90=down, default: 0)'),
+      height: z.number().optional().describe('Height offset above ground in meters (default: 0)'),
+      innerRadius: z.number().min(0).optional().describe('Inner radius for hollow cone in meters (default: 0)'),
+      name: z.string().optional().describe('Label for the sensor'),
+      color: colorSchema.optional().describe('Cone color (default: lime)'),
+      opacity: z.number().min(0).max(1).optional().describe('Opacity 0-1 (default: 0.5 semi-transparent)'),
+    }),
+  },
+  // Coordinate-based tools (use location-aware tools above when possible)
   flyTo: {
     name: 'flyTo',
-    description: 'Fly the camera to a specific geographic location',
+    description: 'Fly the camera to specific coordinates. Use flyToLocation instead if you have a place name.',
     inputSchema: z.object({
       longitude: z.number().min(-180).max(180).describe('Longitude in degrees'),
       latitude: z.number().min(-90).max(90).describe('Latitude in degrees'),
@@ -136,6 +218,24 @@ const tools = {
       radiiZ: z.number().positive().describe('Radius in Z direction (meters)'),
       name: z.string().optional(),
       color: colorSchema.optional().describe('Ellipsoid color (default: blue)'),
+    }),
+  },
+  addSensorCone: {
+    name: 'addSensorCone',
+    description: 'Add a sensor cone/fan visualization (partial ellipsoid). Perfect for radar cones, camera FOV, detection zones. The cone extends from the position outward.',
+    inputSchema: z.object({
+      longitude: z.number().min(-180).max(180),
+      latitude: z.number().min(-90).max(90),
+      height: z.number().optional().describe('Height above ground in meters (default: 0)'),
+      radius: z.number().positive().describe('Length/range of the sensor cone in meters'),
+      horizontalAngle: z.number().min(1).max(360).describe('Horizontal field of view in degrees (width of the fan)'),
+      verticalAngle: z.number().min(1).max(180).describe('Vertical field of view in degrees (height of the fan)'),
+      heading: z.number().optional().describe('Direction sensor points in degrees (0=North, 90=East, default: 0)'),
+      pitch: z.number().min(-90).max(90).optional().describe('Pitch angle in degrees (0=horizontal, -90=down, default: 0)'),
+      innerRadius: z.number().min(0).optional().describe('Inner radius for hollow cone in meters (default: 0)'),
+      name: z.string().optional().describe('Label for the sensor'),
+      color: colorSchema.optional().describe('Cone color (default: lime)'),
+      opacity: z.number().min(0).max(1).optional().describe('Opacity 0-1 (default: 0.5 semi-transparent)'),
     }),
   },
   addCylinder: {
@@ -550,6 +650,14 @@ const tools = {
       index: z.number().int().min(0).describe('Index of the imagery layer to remove'),
     }),
   },
+  setImagery: {
+    name: 'setImagery',
+    description: 'Switch the base imagery layer. Use: "bing", "osm", "arcgis", "sentinel", "stamen-terrain", "stamen-toner"',
+    inputSchema: z.object({
+      provider: z.enum(['bing', 'osm', 'arcgis', 'sentinel', 'stamen-terrain', 'stamen-toner', 'ion']).describe('Imagery provider name'),
+      ionAssetId: z.number().optional().describe('Cesium Ion asset ID (if provider is "ion")'),
+    }),
+  },
   setImageryAlpha: {
     name: 'setImageryAlpha',
     description: 'Set the transparency of an imagery layer',
@@ -889,87 +997,35 @@ const tools = {
       tileMatrixSetID: z.string().optional().describe('Tile matrix set identifier'),
     }),
   },
-
-  // ============================================
-  // LOCATION-AWARE TOOLS (use built-in location database)
-  // ============================================
-  resolveLocation: {
-    name: 'resolveLocation',
-    description: 'Resolve a location name (city, landmark, etc.) to geographic coordinates. Use this to get coordinates for places like "Paris", "Tokyo", "Eiffel Tower", "Grand Canyon", etc.',
+  // Vision and Analysis Tools
+  captureView: {
+    name: 'captureView',
+    description: 'Capture the current view as an image. Returns base64-encoded image data that can be sent to a multi-modal LLM for analysis.',
     inputSchema: z.object({
-      location: z.string().describe('Location name to resolve (e.g., "Seattle", "Eiffel Tower", "Grand Canyon")'),
+      format: z.enum(['jpeg', 'png']).optional().describe('Image format (default: jpeg)'),
+      quality: z.number().min(0).max(1).optional().describe('JPEG quality 0-1 (default: 0.85)'),
     }),
   },
-  listLocations: {
-    name: 'listLocations',
-    description: 'List all known location names that can be resolved to coordinates. Use this to discover what locations are available.',
+  analyzeView: {
+    name: 'analyzeView',
+    description: 'Analyze the current view using a multi-modal LLM to detect features, structures, and orientations. Requires an LLM provider to be configured.',
     inputSchema: z.object({
-      filter: z.string().optional().describe('Optional filter string to search location names'),
+      prompt: z.string().optional().describe('Custom analysis prompt (default: general feature detection)'),
+      drawResults: z.boolean().optional().describe('Draw bounding boxes on detected features (default: true)'),
     }),
   },
-  flyToLocation: {
-    name: 'flyToLocation',
-    description: 'Fly the camera to a named location. PREFERRED over flyTo when you know the location name (e.g., "Seattle", "Tokyo", "Grand Canyon").',
+  detectHeadingAtLocation: {
+    name: 'detectHeadingAtLocation',
+    description: 'Use multi-modal LLM to detect the heading/orientation of linear features (bridges, roads, runways) at a specific location.',
     inputSchema: z.object({
-      location: z.string().describe('Location name (e.g., "Seattle", "Tokyo", "Eiffel Tower")'),
-      height: z.number().positive().optional().describe('Camera height in meters (default: 500000)'),
-      duration: z.number().positive().optional().describe('Flight duration in seconds (default: 2)'),
+      locationName: z.string().describe('Name of the location to analyze'),
+      zoomLevel: z.number().positive().optional().describe('Camera height for analysis in meters (default: 1000)'),
     }),
   },
-  addSphereAtLocation: {
-    name: 'addSphereAtLocation',
-    description: 'Add a 3D sphere at a named location. PREFERRED over addSphere when you know the location name.',
-    inputSchema: z.object({
-      location: z.string().describe('Location name (e.g., "Seattle", "Tokyo", "CERN")'),
-      radius: z.number().positive().describe('Sphere radius in meters'),
-      height: z.number().optional().describe('Height above ground in meters (default: sphere radius)'),
-      name: z.string().optional().describe('Name for the sphere'),
-      color: colorSchema.optional().describe('Sphere color (default: blue)'),
-    }),
-  },
-  addBoxAtLocation: {
-    name: 'addBoxAtLocation',
-    description: 'Add a 3D box at a named location. PREFERRED over addBox when you know the location name.',
-    inputSchema: z.object({
-      location: z.string().describe('Location name (e.g., "Seattle", "Space Needle")'),
-      dimensionX: z.number().positive().describe('Width in meters (X dimension)'),
-      dimensionY: z.number().positive().describe('Depth in meters (Y dimension)'),
-      dimensionZ: z.number().positive().describe('Height in meters (Z dimension)'),
-      height: z.number().optional().describe('Height above ground for the box center'),
-      name: z.string().optional().describe('Name for the box'),
-      color: colorSchema.optional().describe('Box color (default: blue)'),
-    }),
-  },
-  addCylinderAtLocation: {
-    name: 'addCylinderAtLocation',
-    description: 'Add a 3D cylinder at a named location. Set topRadius to 0 for a cone.',
-    inputSchema: z.object({
-      location: z.string().describe('Location name'),
-      length: z.number().positive().describe('Height of the cylinder in meters'),
-      topRadius: z.number().min(0).describe('Top radius in meters (0 for cone)'),
-      bottomRadius: z.number().positive().describe('Bottom radius in meters'),
-      name: z.string().optional().describe('Name for the cylinder'),
-      color: colorSchema.optional().describe('Cylinder color (default: blue)'),
-    }),
-  },
-  addPointAtLocation: {
-    name: 'addPointAtLocation',
-    description: 'Add a point marker at a named location.',
-    inputSchema: z.object({
-      location: z.string().describe('Location name'),
-      name: z.string().optional().describe('Label for the point'),
-      color: colorSchema.optional().describe('Point color (default: yellow)'),
-      size: z.number().positive().optional().describe('Point size in pixels (default: 10)'),
-    }),
-  },
-  addLabelAtLocation: {
-    name: 'addLabelAtLocation',
-    description: 'Add a text label at a named location.',
-    inputSchema: z.object({
-      location: z.string().describe('Location name'),
-      text: z.string().describe('Label text'),
-      color: colorSchema.optional().describe('Label color (default: white)'),
-    }),
+  clearAnnotations: {
+    name: 'clearAnnotations',
+    description: 'Remove all analysis annotations (bounding boxes, labels) from the scene.',
+    inputSchema: z.object({}),
   },
 };
 
@@ -987,11 +1043,28 @@ export class CesiumMCPServer {
     resolve: (value: unknown) => void;
     reject: (reason: unknown) => void;
   }> = new Map();
+  private canvasAnalyzer?: CanvasAnalyzer;
 
   constructor(transport: BrowserTransport, commandHandler: CommandHandler) {
     this.transport = transport;
     this.commandHandler = commandHandler;
     this.setupMessageHandler();
+  }
+
+  /**
+   * Set the canvas analyzer for vision tools
+   */
+  setCanvasAnalyzer(analyzer: CanvasAnalyzer): void {
+    this.canvasAnalyzer = analyzer;
+  }
+
+  /**
+   * Set the LLM provider for the canvas analyzer
+   */
+  setVisionLLMProvider(provider: LLMProvider): void {
+    if (this.canvasAnalyzer) {
+      this.canvasAnalyzer.setLLMProvider(provider);
+    }
   }
 
   private setupMessageHandler(): void {
@@ -1100,6 +1173,218 @@ export class CesiumMCPServer {
 
   private async executeTool(name: ToolName, input: unknown): Promise<{ success: boolean; message: string; data?: unknown }> {
     switch (name) {
+      // Location-aware tools (resolve place names to coordinates)
+      case 'resolveLocation': {
+        const args = input as { locationName: string; latitude?: number; longitude?: number };
+        const location = resolveLocationName(args.locationName);
+        if (!location) {
+          // Use fallback coordinates if provided
+          if (args.latitude !== undefined && args.longitude !== undefined) {
+            const fallbackLocation = {
+              latitude: args.latitude,
+              longitude: args.longitude,
+              height: 15000, // Default viewing height
+            };
+            return {
+              success: true,
+              message: `Location "${args.locationName}" not in database, using provided coordinates`,
+              data: fallbackLocation,
+            };
+          }
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback, or use a city name, landmark, or coordinates.`,
+          };
+        }
+        return {
+          success: true,
+          message: `Resolved "${args.locationName}" to coordinates`,
+          data: location,
+        };
+      }
+
+      case 'flyToLocation': {
+        const args = input as { locationName: string; latitude?: number; longitude?: number; height?: number; duration?: number };
+        let location = resolveLocationName(args.locationName);
+
+        // Use fallback coordinates if location not found and fallback provided
+        if (!location && args.latitude !== undefined && args.longitude !== undefined) {
+          location = {
+            latitude: args.latitude,
+            longitude: args.longitude,
+            height: args.height || 15000,
+          };
+        }
+
+        if (!location) {
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback.`,
+          };
+        }
+        const command: CesiumCommand = {
+          type: 'camera.flyTo',
+          destination: {
+            longitude: location.longitude,
+            latitude: location.latitude,
+            height: args.height || location.height || 15000,
+          },
+          duration: args.duration || 3,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addSphereAtLocation': {
+        const args = input as { locationName: string; latitude?: number; longitude?: number; radius: number; color?: string; name?: string; height?: number };
+        let location = resolveLocationName(args.locationName);
+
+        // Use fallback coordinates if location not found and fallback provided
+        if (!location && args.latitude !== undefined && args.longitude !== undefined) {
+          location = {
+            latitude: args.latitude,
+            longitude: args.longitude,
+            height: args.height || args.radius,
+          };
+        }
+
+        if (!location) {
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback.`,
+          };
+        }
+        const entity = czmlGenerator.createSphere(
+          { longitude: location.longitude, latitude: location.latitude, height: args.height || args.radius },
+          args.radius,
+          { name: args.name || args.locationName, color: args.color }
+        );
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addPointAtLocation': {
+        const args = input as { locationName: string; latitude?: number; longitude?: number; name?: string; color?: string; size?: number };
+        let location = resolveLocationName(args.locationName);
+
+        // Use fallback coordinates if location not found and fallback provided
+        if (!location && args.latitude !== undefined && args.longitude !== undefined) {
+          location = {
+            latitude: args.latitude,
+            longitude: args.longitude,
+            height: 0,
+          };
+        }
+
+        if (!location) {
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback.`,
+          };
+        }
+        const entity = czmlGenerator.createPoint(
+          { longitude: location.longitude, latitude: location.latitude },
+          { name: args.name || args.locationName, color: args.color, pixelSize: args.size }
+        );
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addBoxAtLocation': {
+        const args = input as { locationName: string; latitude?: number; longitude?: number; dimensionX: number; dimensionY: number; dimensionZ: number; name?: string; color?: string; heading?: number };
+        let location = resolveLocationName(args.locationName);
+
+        // Use fallback coordinates if location not found and fallback provided
+        if (!location && args.latitude !== undefined && args.longitude !== undefined) {
+          location = {
+            latitude: args.latitude,
+            longitude: args.longitude,
+            height: 0,
+          };
+        }
+
+        if (!location) {
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback.`,
+          };
+        }
+        // Enforce minimum dimensions (at least 10 meters) to ensure visibility
+        const dimX = Math.max(args.dimensionX || 100, 10);
+        const dimY = Math.max(args.dimensionY || 100, 10);
+        const dimZ = Math.max(args.dimensionZ || 50, 10); // Default height of 50m if 0 or missing
+        const entity = czmlGenerator.createBox(
+          { longitude: location.longitude, latitude: location.latitude, height: dimZ / 2 },
+          { x: dimX, y: dimY, z: dimZ },
+          { name: args.name || args.locationName, color: args.color, heading: args.heading }
+        );
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addSensorConeAtLocation': {
+        const args = input as {
+          locationName: string;
+          latitude?: number;
+          longitude?: number;
+          radius: number;
+          horizontalAngle: number;
+          verticalAngle: number;
+          heading?: number;
+          pitch?: number;
+          height?: number;
+          innerRadius?: number;
+          name?: string;
+          color?: string;
+          opacity?: number;
+        };
+        let location = resolveLocationName(args.locationName);
+
+        // Use fallback coordinates if location not found and fallback provided
+        if (!location && args.latitude !== undefined && args.longitude !== undefined) {
+          location = {
+            latitude: args.latitude,
+            longitude: args.longitude,
+            height: 0,
+          };
+        }
+
+        if (!location) {
+          return {
+            success: false,
+            message: `Unknown location: "${args.locationName}". Try providing latitude/longitude as fallback.`,
+          };
+        }
+        const entity = czmlGenerator.createSensorCone(
+          { longitude: location.longitude, latitude: location.latitude, height: args.height || 0 },
+          {
+            radius: args.radius,
+            horizontalAngle: args.horizontalAngle,
+            verticalAngle: args.verticalAngle,
+            heading: args.heading,
+            pitch: args.pitch,
+            innerRadius: args.innerRadius,
+            name: args.name || `${args.locationName} Sensor`,
+            color: args.color,
+            opacity: args.opacity,
+          }
+        );
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity,
+        };
+        return this.commandHandler(command);
+      }
+
+      // Coordinate-based tools
       case 'flyTo': {
         const args = input as ToolInput<'flyTo'>;
         const command: CesiumCommand = {
@@ -1227,6 +1512,29 @@ export class CesiumMCPServer {
           { longitude: args.longitude, latitude: args.latitude, height: args.height },
           { x: args.radiiX, y: args.radiiY, z: args.radiiZ },
           { name: args.name, color: args.color }
+        );
+        const command: CesiumCommand = {
+          type: 'entity.add',
+          entity,
+        };
+        return this.commandHandler(command);
+      }
+
+      case 'addSensorCone': {
+        const args = input as ToolInput<'addSensorCone'>;
+        const entity = czmlGenerator.createSensorCone(
+          { longitude: args.longitude, latitude: args.latitude, height: args.height },
+          {
+            radius: args.radius,
+            horizontalAngle: args.horizontalAngle,
+            verticalAngle: args.verticalAngle,
+            heading: args.heading,
+            pitch: args.pitch,
+            innerRadius: args.innerRadius,
+            name: args.name,
+            color: args.color,
+            opacity: args.opacity,
+          }
         );
         const command: CesiumCommand = {
           type: 'entity.add',
@@ -1801,6 +2109,15 @@ export class CesiumMCPServer {
         return this.commandHandler(command);
       }
 
+      case 'setImagery': {
+        const args = input as ToolInput<'setImagery'>;
+        const command: CesiumCommand = {
+          type: 'imagery.add',
+          provider: args.provider as 'bing' | 'osm' | 'arcgis' | 'tms' | 'wms',
+        };
+        return this.commandHandler(command);
+      }
+
       case 'setImageryAlpha': {
         const args = input as ToolInput<'setImageryAlpha'>;
         const command: CesiumCommand = {
@@ -2224,175 +2541,81 @@ export class CesiumMCPServer {
         return this.commandHandler(command);
       }
 
-      // ============================================
-      // LOCATION-AWARE TOOLS
-      // ============================================
-      case 'resolveLocation': {
-        const args = input as ToolInput<'resolveLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (coords) {
-          return {
-            success: true,
-            message: `Resolved "${args.location}" to coordinates`,
-            data: {
-              location: args.location,
-              longitude: coords.longitude,
-              latitude: coords.latitude,
-              height: coords.height,
-            },
-          };
+      // Vision and Analysis Tools
+      case 'captureView': {
+        if (!this.canvasAnalyzer) {
+          return { success: false, message: 'Canvas analyzer not configured. Set up vision module first.' };
         }
-        return {
-          success: false,
-          message: `Location "${args.location}" not found in database. Use listLocations to see available locations.`,
-        };
-      }
-
-      case 'listLocations': {
-        const args = input as ToolInput<'listLocations'>;
-        let locations = Object.keys(KNOWN_LOCATIONS);
-        if (args.filter) {
-          const filterLower = args.filter.toLowerCase();
-          locations = locations.filter(loc => loc.includes(filterLower));
-        }
+        const args = input as { format?: 'jpeg' | 'png'; quality?: number };
+        const imageData = this.canvasAnalyzer.captureCanvas(args.format || 'jpeg', args.quality || 0.85);
         return {
           success: true,
-          message: `Found ${locations.length} locations`,
-          data: {
-            count: locations.length,
-            locations: locations.sort(),
-          },
+          message: 'View captured successfully',
+          data: { imageDataUrl: imageData, format: args.format || 'jpeg' },
         };
       }
 
-      case 'flyToLocation': {
-        const args = input as ToolInput<'flyToLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
-          return {
-            success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
-          };
+      case 'analyzeView': {
+        if (!this.canvasAnalyzer) {
+          return { success: false, message: 'Canvas analyzer not configured. Set up vision module first.' };
         }
-        const command: CesiumCommand = {
-          type: 'camera.flyTo',
-          destination: {
-            longitude: coords.longitude,
-            latitude: coords.latitude,
-            height: args.height || 500000,
-          },
-          duration: args.duration,
-        };
-        return this.commandHandler(command);
-      }
-
-      case 'addSphereAtLocation': {
-        const args = input as ToolInput<'addSphereAtLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
-          return {
-            success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
-          };
-        }
-        const entity = czmlGenerator.createSphere(
-          { longitude: coords.longitude, latitude: coords.latitude, height: args.height ?? args.radius },
-          args.radius,
-          { name: args.name || `Sphere at ${args.location}`, color: args.color }
-        );
-        const command: CesiumCommand = {
-          type: 'entity.add',
-          entity,
-        };
-        return this.commandHandler(command);
-      }
-
-      case 'addBoxAtLocation': {
-        const args = input as ToolInput<'addBoxAtLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
-          return {
-            success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
-          };
-        }
-        const entity = czmlGenerator.createBox(
-          { longitude: coords.longitude, latitude: coords.latitude, height: args.height },
-          { x: args.dimensionX, y: args.dimensionY, z: args.dimensionZ },
-          { name: args.name || `Box at ${args.location}`, color: args.color }
-        );
-        const command: CesiumCommand = {
-          type: 'entity.add',
-          entity,
-        };
-        return this.commandHandler(command);
-      }
-
-      case 'addCylinderAtLocation': {
-        const args = input as ToolInput<'addCylinderAtLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
-          return {
-            success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
-          };
-        }
-        const entity = czmlGenerator.createCylinder(
-          { longitude: coords.longitude, latitude: coords.latitude },
-          {
-            length: args.length,
-            topRadius: args.topRadius,
-            bottomRadius: args.bottomRadius,
-            name: args.name || `Cylinder at ${args.location}`,
-            color: args.color,
+        const args = input as { prompt?: string; drawResults?: boolean };
+        try {
+          const result = await this.canvasAnalyzer.analyzeCurrentView(args.prompt);
+          if (args.drawResults !== false && result.features.length > 0) {
+            this.canvasAnalyzer.drawBoundingBoxes(result.features);
           }
-        );
-        const command: CesiumCommand = {
-          type: 'entity.add',
-          entity,
-        };
-        return this.commandHandler(command);
-      }
-
-      case 'addPointAtLocation': {
-        const args = input as ToolInput<'addPointAtLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
+          return {
+            success: true,
+            message: `Detected ${result.features.length} features`,
+            data: { features: result.features, rawResponse: result.rawResponse },
+          };
+        } catch (error) {
           return {
             success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
+            message: error instanceof Error ? error.message : 'Analysis failed',
           };
         }
-        const entity = czmlGenerator.createPoint(
-          { longitude: coords.longitude, latitude: coords.latitude },
-          { name: args.name || args.location, color: args.color, pixelSize: args.size }
-        );
-        const command: CesiumCommand = {
-          type: 'entity.add',
-          entity,
-        };
-        return this.commandHandler(command);
       }
 
-      case 'addLabelAtLocation': {
-        const args = input as ToolInput<'addLabelAtLocation'>;
-        const coords = resolveLocationName(args.location);
-        if (!coords) {
+      case 'detectHeadingAtLocation': {
+        if (!this.canvasAnalyzer) {
+          return { success: false, message: 'Canvas analyzer not configured. Set up vision module first.' };
+        }
+        const args = input as { locationName: string; zoomLevel?: number };
+        const location = resolveLocationName(args.locationName);
+        if (!location) {
+          return { success: false, message: `Unknown location: "${args.locationName}"` };
+        }
+        try {
+          const heading = await this.canvasAnalyzer.detectHeadingAtLocation(
+            location.longitude,
+            location.latitude,
+            { zoomLevel: args.zoomLevel || 1000 }
+          );
+          if (heading !== null) {
+            return {
+              success: true,
+              message: `Detected heading at ${args.locationName}: ${heading.toFixed(1)}°`,
+              data: { heading, location: args.locationName },
+            };
+          } else {
+            return { success: false, message: 'Could not detect heading at this location' };
+          }
+        } catch (error) {
           return {
             success: false,
-            message: `Location "${args.location}" not found. Use listLocations to see available locations.`,
+            message: error instanceof Error ? error.message : 'Heading detection failed',
           };
         }
-        const entity = czmlGenerator.createLabel(
-          { longitude: coords.longitude, latitude: coords.latitude },
-          args.text,
-          { fillColor: args.color }
-        );
-        const command: CesiumCommand = {
-          type: 'entity.add',
-          entity,
-        };
-        return this.commandHandler(command);
+      }
+
+      case 'clearAnnotations': {
+        if (!this.canvasAnalyzer) {
+          return { success: false, message: 'Canvas analyzer not configured.' };
+        }
+        this.canvasAnalyzer.clearAnnotations();
+        return { success: true, message: 'Annotations cleared' };
       }
 
       default:
@@ -2514,6 +2737,30 @@ export class CesiumMCPServer {
         params: { name, arguments: args },
       });
     });
+  }
+
+  /**
+   * Execute a tool directly without going through the transport.
+   * Used by the app to execute LLM-generated tool calls.
+   */
+  async executeToolDirect(name: string, args: unknown): Promise<{ success: boolean; message: string; data?: unknown }> {
+    const tool = tools[name as ToolName];
+
+    if (!tool) {
+      return { success: false, message: `Unknown tool: ${name}` };
+    }
+
+    try {
+      // Validate input
+      const validatedInput = tool.inputSchema.parse(args);
+      // Execute tool
+      return await this.executeTool(name as ToolName, validatedInput);
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Tool execution failed',
+      };
+    }
   }
 
   // Helper to convert Zod schema to JSON Schema

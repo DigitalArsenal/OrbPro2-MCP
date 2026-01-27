@@ -11,6 +11,9 @@ export type {
   InitProgressReport,
 } from './web-llm-engine';
 
+export { APILLMEngine, API_PROVIDERS, checkOllamaAvailable, getOllamaModels } from './api-llm-engine';
+export type { APILLMConfig, APIProvider } from './api-llm-engine';
+
 export { CommandParser } from './command-parser';
 export type { ParseResult } from './command-parser';
 

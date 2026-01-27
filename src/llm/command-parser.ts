@@ -785,13 +785,29 @@ export class CommandParser {
     // Try to extract commands from natural language
     const commands: CesiumCommand[] = [];
 
-    // Navigation commands
-    if (this.matchesPattern(normalizedInput, ['fly to', 'go to', 'show me', 'take me to', 'navigate to', 'zoom to'])) {
-      const location = this.extractLocation(normalizedInput);
+    // Check for zoom + location requests first (e.g., "zoom in so I can see the statue of liberty")
+    // These should fly to the location at a close altitude
+    const zoomSeeMatch = normalizedInput.match(/(?:zoom|get)\s+(?:in\s+)?(?:closer\s+)?(?:so\s+(?:i\s+can\s+)?|to\s+)?(?:see|view)\s+(?:the\s+)?(?:actual\s+)?(.+)/i);
+    if (zoomSeeMatch) {
+      const location = this.extractLocation(zoomSeeMatch[1]!);
       if (location) {
         commands.push({
           type: 'camera.flyTo',
-          destination: location,
+          destination: { ...location, height: 500 },
+          duration: 2,
+        });
+      }
+    }
+
+    // Navigation commands - use appropriate height based on location type
+    if (commands.length === 0 && this.matchesPattern(normalizedInput, ['fly to', 'go to', 'show me', 'take me to', 'navigate to', 'zoom to'])) {
+      const location = this.extractLocation(normalizedInput);
+      if (location) {
+        // Use 15km (15000m) for landmarks and specific locations - allows seeing the area clearly
+        // The executor defaults to 1000km if no height specified, which is too high for local views
+        commands.push({
+          type: 'camera.flyTo',
+          destination: { ...location, height: location.height || 15000 },
           duration: 3,
         });
       }
@@ -803,11 +819,45 @@ export class CommandParser {
       commands.push(geometryResult);
     }
 
-    // Zoom commands
-    if (this.matchesPattern(normalizedInput, ['zoom in'])) {
-      commands.push({ type: 'camera.zoom', amount: 1000000 });
-    } else if (this.matchesPattern(normalizedInput, ['zoom out'])) {
-      commands.push({ type: 'camera.zoom', amount: -1000000 });
+    // Zoom commands - only process if we haven't already handled a zoom+location request above
+    // Check if we already added a flyTo from the zoomSeeMatch (lines 788-800)
+    const alreadyHandledZoom = commands.some(c => c.type === 'camera.flyTo');
+
+    if (!alreadyHandledZoom) {
+      // Check for "zoom to [location]" pattern
+      const zoomToLocationMatch = normalizedInput.match(/zoom\s+(?:in\s+)?(?:to|on|at)\s+(?:see\s+)?(?:the\s+)?(.+?)(?:\s+fills|\s+in\s+frame|\s+in\s+view)?$/i);
+      if (zoomToLocationMatch) {
+        const locationText = zoomToLocationMatch[1]!.trim();
+        const location = this.extractLocation(locationText);
+        if (location) {
+          // Fly to location at a close altitude (500m for landmarks, allows seeing detail)
+          commands.push({
+            type: 'camera.flyTo',
+            destination: { ...location, height: 500 },
+            duration: 2,
+          });
+        }
+      }
+      // Check for "zoom so [location] fills" pattern
+      else if (normalizedInput.match(/zoom\s+(?:in\s+)?(?:so|until|that)\s+(?:the\s+)?(.+?)\s+fills/i)) {
+        const match = normalizedInput.match(/zoom\s+(?:in\s+)?(?:so|until|that)\s+(?:the\s+)?(.+?)\s+fills/i);
+        if (match) {
+          const location = this.extractLocation(match[1]!);
+          if (location) {
+            commands.push({
+              type: 'camera.flyTo',
+              destination: { ...location, height: 300 },
+              duration: 2,
+            });
+          }
+        }
+      }
+      // Simple zoom in/out - only if the command is JUST "zoom in" or "zoom out" (not part of a longer phrase)
+      else if (/^(?:really\s+)?zoom\s+in\s*$/.test(normalizedInput)) {
+        commands.push({ type: 'camera.zoom', amount: 10000 });
+      } else if (/^(?:really\s+)?zoom\s+out\s*$/.test(normalizedInput)) {
+        commands.push({ type: 'camera.zoom', amount: -50000 });
+      }
     }
 
     // Scene mode commands
