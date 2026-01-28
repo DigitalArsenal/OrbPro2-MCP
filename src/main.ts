@@ -1,5 +1,5 @@
 /**
- * Cesium SLM - Entry Point
+ * OrbPro2 MCP - Entry Point
  * Browser-based Small Language Model for CesiumJS Control
  */
 
@@ -39,13 +39,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       cesiumToken: import.meta.env.VITE_CESIUM_TOKEN || undefined,
     });
 
-    console.log('Cesium SLM initialized successfully');
+    console.log('OrbPro2 MCP initialized successfully');
 
     // Expose app to window for debugging
     (window as unknown as { cesiumSLM: CesiumSLMApp }).cesiumSLM = app;
 
   } catch (error) {
-    console.error('Failed to initialize Cesium SLM:', error);
+    console.error('Failed to initialize OrbPro2 MCP:', error);
     // Log full stack trace for debugging
     if (error instanceof Error && error.stack) {
       console.error('Stack trace:', error.stack);

@@ -1,7 +1,7 @@
 [
   {
     "id": "document",
-    "name": "Sample Cesium SLM Entities",
+    "name": "Sample OrbPro2 MCP Entities",
     "version": "1.0",
     "clock": {
       "interval": "2024-01-01T00:00:00Z/2024-12-31T23:59:59Z",

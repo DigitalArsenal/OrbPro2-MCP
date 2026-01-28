@@ -1888,6 +1888,20 @@ Choose height based on what the user wants to see:
 
 Valid colors: red, green, blue, yellow, orange, purple, pink, cyan, white, black, gray
 
+## POPULATION QUERIES
+
+Use showTopCitiesByPopulation when users want to VISUALIZE cities by population:
+- "show me the biggest cities", "display most populous cities", "put circles on largest cities"
+- Adds circles on the map sized proportionally to population
+
+Examples:
+User: "Show me the 100 most populous cities with circles" → {"tool": "showTopCitiesByPopulation", "arguments": {"count": 100}}
+User: "Display the 50 largest cities" → {"tool": "showTopCitiesByPopulation", "arguments": {"count": 50, "color": "cyan"}}
+User: "Put circles on top cities proportional to population" → {"tool": "showTopCitiesByPopulation", "arguments": {"count": 20}}
+
+Use getTopCitiesByPopulation ONLY when users just want DATA (no visualization):
+User: "What are the 10 biggest cities?" (just asking, not showing) → {"tool": "getTopCitiesByPopulation", "arguments": {"count": 10}}
+
 ## HANDLING SPECIAL CASES
 
 1. NAMED LOCATIONS: ALWAYS use location-aware tools (flyToLocation, addBoxAtLocation, etc.)

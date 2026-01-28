@@ -98,7 +98,7 @@ export interface CustomModelConfig {
 
 // Registry for custom models (populate after compiling with scripts/compile-cesium-slm.sh)
 export const CUSTOM_MODEL_REGISTRY: Record<string, CustomModelConfig> = {
-  // OrbPro Cesium SLM 1.5B - Fine-tuned on 88K+ Cesium command examples
+  // OrbPro OrbPro2 MCP 1.5B - Fine-tuned on 88K+ Cesium command examples
   'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC': {
     modelId: 'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC',
     modelLibUrl: '/models/OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC.wasm',
@@ -106,7 +106,7 @@ export const CUSTOM_MODEL_REGISTRY: Record<string, CustomModelConfig> = {
     vramRequired: 1024,
     contextWindowSize: 4096,
   },
-  // OrbPro Cesium SLM 0.5B (legacy - broken)
+  // OrbPro OrbPro2 MCP 0.5B (legacy - broken)
   'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC': {
     modelId: 'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC',
     modelLibUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC.wasm',
@@ -121,7 +121,7 @@ export function isCustomModelAvailable(): boolean {
   return Object.keys(CUSTOM_MODEL_REGISTRY).length > 0;
 }
 
-// Get the primary custom model ID (the trained Cesium SLM)
+// Get the primary custom model ID (the trained OrbPro2 MCP)
 export function getCustomModelId(): string | null {
   const customModels = Object.keys(CUSTOM_MODEL_REGISTRY);
   return customModels.length > 0 ? customModels[0]! : null;

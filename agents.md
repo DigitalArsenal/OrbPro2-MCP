@@ -1,4 +1,4 @@
-# Cesium SLM - Agent Task Orchestration
+# OrbPro2 MCP - Agent Task Orchestration
 
 ## Project Goal
 
@@ -176,7 +176,7 @@ nginx.conf                    # Production nginx config
 
 ## SUMMARY
 
-The Cesium SLM project is now feature-complete with:
+The OrbPro2 MCP project is now feature-complete with:
 
 - **WebGPU LLM Inference**: Runs small language models directly in the browser
 - **Natural Language Control**: Users can control CesiumJS with plain English
@@ -190,4 +190,4 @@ The Cesium SLM project is now feature-complete with:
 
 ---
 
-Cesium SLM Finished
+OrbPro2 MCP Finished

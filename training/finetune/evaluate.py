@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluation Script for Cesium SLM
+Evaluation Script for OrbPro2 MCP
 
 Evaluates fine-tuned models on test data for:
 - Tool selection accuracy
@@ -248,7 +248,7 @@ def print_results(results: list[EvalResult], output_file: Optional[str] = None):
                 tool_stats[tool]["correct"] += 1
 
     # Print summary table
-    table = Table(title="Cesium SLM Evaluation Results")
+    table = Table(title="OrbPro2 MCP Evaluation Results")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     table.add_column("Percentage", style="yellow")
@@ -319,7 +319,7 @@ def print_results(results: list[EvalResult], output_file: Optional[str] = None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate Cesium SLM model")
+    parser = argparse.ArgumentParser(description="Evaluate OrbPro2 MCP model")
 
     parser.add_argument("--model", type=str, required=True,
                        help="Path to model or LoRA adapter")

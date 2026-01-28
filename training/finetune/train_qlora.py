@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-QLoRA Fine-tuning Script for Cesium SLM
+QLoRA Fine-tuning Script for OrbPro2 MCP
 
 Memory-efficient fine-tuning using 4-bit quantization with LoRA.
 Suitable for training on consumer GPUs with limited VRAM.
@@ -53,7 +53,7 @@ def formatting_prompts_func(examples):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="QLoRA fine-tuning for Cesium SLM")
+    parser = argparse.ArgumentParser(description="QLoRA fine-tuning for OrbPro2 MCP")
 
     # Model arguments
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-0.5B-Instruct",

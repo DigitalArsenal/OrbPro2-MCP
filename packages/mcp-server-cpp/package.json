@@ -17,15 +17,13 @@
     "build": "./scripts/build-wasm.sh",
     "build:debug": "./scripts/build-wasm.sh debug",
     "build:native": "./scripts/build-native.sh",
-    "generate-headers": "node scripts/generate-headers.mjs",
     "test": "./scripts/build-native.sh && ./build-native/cesium-mcp-wasm"
   },
   "keywords": [
     "cesium",
     "mcp",
     "wasm",
-    "webassembly",
-    "flatbuffers"
+    "webassembly"
   ],
   "author": "",
   "license": "MIT"

@@ -1,5 +1,5 @@
 /**
- * Cesium SLM - Public API Exports
+ * OrbPro2 MCP - Public API Exports
  * Browser-based Small Language Model for CesiumJS Control
  */
 

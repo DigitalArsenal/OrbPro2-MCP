@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and run MLC compilation for OrbPro Cesium SLM 1.5B via Docker
+# Build and run MLC compilation for OrbPro OrbPro2 MCP 1.5B via Docker
 
 set -e
 
@@ -20,7 +20,7 @@ QUANTIZATION="q4f16_1"
 CONTEXT_WINDOW=4096
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  OrbPro Cesium SLM 1.5B - Docker MLC Compilation           ║${NC}"
+echo -e "${GREEN}║  OrbPro OrbPro2 MCP 1.5B - Docker MLC Compilation           ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

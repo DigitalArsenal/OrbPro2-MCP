@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compile OrbPro Cesium SLM to MLC format for WebLLM
+# Compile OrbPro OrbPro2 MCP to MLC format for WebLLM
 # This script compiles the fine-tuned Qwen2.5-0.5B model for WebGPU browser inference
 
 set -e
@@ -18,7 +18,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║     OrbPro Cesium SLM - MLC WebGPU Compilation            ║${NC}"
+echo -e "${GREEN}║     OrbPro OrbPro2 MCP - MLC WebGPU Compilation            ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -234,7 +234,7 @@ EOF
 
     # Create README
     cat > "./${OUTPUT_NAME}/README.md" << EOF
-# OrbPro Cesium SLM (0.5B)
+# OrbPro OrbPro2 MCP (0.5B)
 
 Fine-tuned language model for CesiumJS globe control, optimized for WebGPU inference.
 

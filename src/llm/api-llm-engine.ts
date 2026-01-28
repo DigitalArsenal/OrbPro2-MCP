@@ -286,7 +286,7 @@ export class APILLMEngine {
     // OpenRouter requires additional headers
     if (this.config.provider === 'openrouter') {
       headers['HTTP-Referer'] = window.location.origin;
-      headers['X-Title'] = 'Cesium SLM';
+      headers['X-Title'] = 'OrbPro2 MCP';
     }
 
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {

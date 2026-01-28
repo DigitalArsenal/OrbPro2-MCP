@@ -16,7 +16,8 @@ struct Location {
   const char* name;
   double longitude;
   double latitude;
-  double heading;  // Orientation in degrees (0=North, 90=East), -1 = not set
+  double heading;     // Orientation in degrees (0=North, 90=East), -1 = not set
+  int population;     // Population count, 0 = unknown
 };
 
 /**
@@ -100,6 +101,22 @@ int levenshtein_distance(const char* s1, const char* s2, int max_distance = -1);
  * @return true if needle is found in haystack
  */
 bool contains_substring(const char* haystack, const char* needle);
+
+/**
+ * Get top cities sorted by population
+ * @param results Output array of location pointers
+ * @param max_results Maximum number of results to return
+ * @param min_population Minimum population threshold (default: 0)
+ * @return Number of cities found
+ */
+size_t get_top_cities_by_population(const Location** results, size_t max_results,
+                                     int min_population = 0);
+
+/**
+ * Get total number of cities with known population
+ * @return Count of cities with population > 0
+ */
+size_t get_cities_with_population_count();
 
 }  // namespace mcp
 }  // namespace cesium

@@ -43,6 +43,8 @@ static const char* TOOL_DEFINITIONS = R"JSON([
   {"name":"clearAll","description":"Remove all entities","inputSchema":{"type":"object","properties":{}}},
   {"name":"resolveLocation","description":"Resolve a location name to coordinates","inputSchema":{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}},
   {"name":"listLocations","description":"List known locations","inputSchema":{"type":"object","properties":{"prefix":{"type":"string"}}}},
+  {"name":"getTopCitiesByPopulation","description":"Get data about most populous cities. Returns data only, no visualization.","inputSchema":{"type":"object","properties":{"count":{"type":"number","description":"Number of cities to return (default: 10, max: 100)"},"minPopulation":{"type":"number","description":"Minimum population threshold (default: 0)"}}}},
+  {"name":"showTopCitiesByPopulation","description":"VISUALIZE the most populous cities on the map. Creates circles OR 3D bar rectangles sized/heighted by population. Use this when user wants to SEE/SHOW biggest cities.","inputSchema":{"type":"object","properties":{"count":{"type":"number","description":"Number of cities to show (default: 10, max: 100)"},"color":{"type":"string","description":"Color (default: cyan)"},"shape":{"type":"string","description":"Shape: 'circle' (flat circles) or 'rectangle' (3D bars with extruded height). Default: circle"},"baseSize":{"type":"number","description":"Base size in meters for rectangles (default: 50000 = 50km)"},"minRadius":{"type":"number","description":"Min radius in meters for circles (default: 10000)"},"maxRadius":{"type":"number","description":"Max radius in meters for circles (default: 200000)"},"minHeight":{"type":"number","description":"Min extruded height in meters for rectangles (default: 10000)"},"maxHeight":{"type":"number","description":"Max extruded height in meters for rectangles (default: 500000)"}}}},
   {"name":"flyToLocation","description":"Fly camera to a named location. Height 1000-50000m typical.","inputSchema":{"type":"object","properties":{"location":{"type":"string"},"height":{"type":"number","description":"Camera height in meters (1000-50000 typical)","minimum":100,"maximum":100000},"duration":{"type":"number","description":"Flight duration in seconds (1-5)"}},"required":["location"]}},
   {"name":"addSphereAtLocation","description":"Add sphere at named location. Radius 10-500m typical.","inputSchema":{"type":"object","properties":{"location":{"type":"string"},"radius":{"type":"number","description":"Radius in meters (10-500 typical)","minimum":1,"maximum":1000},"height":{"type":"number","description":"Height above ground (0-1000m)","maximum":1000},"color":{"type":"string"}},"required":["location"]}},
   {"name":"addBoxAtLocation","description":"Add box at named location. Auto-uses database heading if available; override with heading param (0=North, 90=East).","inputSchema":{"type":"object","properties":{"location":{"type":"string"},"dimensionX":{"type":"number"},"dimensionY":{"type":"number"},"dimensionZ":{"type":"number"},"color":{"type":"string"},"heading":{"type":"number"}},"required":["location"]}},
@@ -135,7 +137,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
     json_get_object(params, "arguments", args_json, sizeof(args_json));
 
-    char result_text[8192];
+    char result_text[32768];
 
     // Handle basic coordinate-based tools
     if (strcmp(tool_name, "flyTo") == 0) {
@@ -145,7 +147,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_number(args_json, "height", height);
         json_get_number(args_json, "duration", duration);
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"flyTo\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f,\"duration\":%.1f}",
+                 "type,longitude,latitude,height,duration\nflyTo,%.6f,%.6f,%.1f,%.1f",
                  lon, lat, height, duration);
     }
     else if (strcmp(tool_name, "addPoint") == 0) {
@@ -168,7 +170,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "color", color, sizeof(color));
         int entity_id = entity_counter++;
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addPoint\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,\"color\":\"%s\",\"name\":\"%s\"}",
+                 "type,id,longitude,latitude,color,name\naddPoint,entity-%d,%.6f,%.6f,%s,%s",
                  entity_id, lon, lat, color, name[0] ? name : "point");
     }
     else if (strcmp(tool_name, "addLabel") == 0) {
@@ -179,7 +181,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "text", text, sizeof(text));
         int entity_id = entity_counter++;
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addLabel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,\"text\":\"%s\"}",
+                 "type,id,longitude,latitude,text\naddLabel,entity-%d,%.6f,%.6f,%s",
                  entity_id, lon, lat, text);
     }
     else if (strcmp(tool_name, "addSphere") == 0) {
@@ -209,7 +211,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         if (height < 0) height = 0;
         int entity_id = entity_counter++;
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addSphere\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f,\"radius\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                 "type,id,longitude,latitude,height,radius,color,name\naddSphere,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
                  entity_id, lon, lat, height, radius, color, name[0] ? name : "sphere");
     }
     else if (strcmp(tool_name, "addBox") == 0) {
@@ -231,7 +233,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         }
         int entity_id = entity_counter++;
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addBox\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f,\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                 "type,id,longitude,latitude,height,dimensionX,dimensionY,dimensionZ,color,name\naddBox,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                  entity_id, lon, lat, height, dim_x, dim_y, dim_z, color, name[0] ? name : "box");
     }
     else if (strcmp(tool_name, "addCylinder") == 0) {
@@ -249,7 +251,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "name", name, sizeof(name));
         int entity_id = entity_counter++;
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addCylinder\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f,\"topRadius\":%.1f,\"bottomRadius\":%.1f,\"cylinderHeight\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                 "type,id,longitude,latitude,height,topRadius,bottomRadius,cylinderHeight,color,name\naddCylinder,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                  entity_id, lon, lat, height, top_radius, bottom_radius, cylinder_height, color, name[0] ? name : "cylinder");
     }
     else if (strcmp(tool_name, "lookAt") == 0) {
@@ -258,23 +260,23 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_number(args_json, "latitude", lat);
         json_get_number(args_json, "range", range);
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"lookAt\",\"longitude\":%.6f,\"latitude\":%.6f,\"range\":%.1f}",
+                 "type,longitude,latitude,range\nlookAt,%.6f,%.6f,%.1f",
                  lon, lat, range);
     }
     else if (strcmp(tool_name, "zoom") == 0) {
         double amount = 1.0;
         json_get_number(args_json, "amount", amount);
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"zoom\",\"amount\":%.2f}", amount);
+                 "type,amount\nzoom,%.2f", amount);
     }
     else if (strcmp(tool_name, "removeEntity") == 0) {
         char entity_id[64] = "";
         json_get_string(args_json, "id", entity_id, sizeof(entity_id));
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"removeEntity\",\"id\":\"%s\"}", entity_id);
+                 "type,id\nremoveEntity,%s", entity_id);
     }
     else if (strcmp(tool_name, "clearAll") == 0) {
-        snprintf(result_text, sizeof(result_text), "{\"type\":\"clearAll\"}");
+        snprintf(result_text, sizeof(result_text), "type\nclearAll");
     }
     // Handle location-aware tools
     else if (strcmp(tool_name, "resolveLocation") == 0) {
@@ -318,8 +320,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 if (duration > 10) duration = 3.0;
 
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"flyTo\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":%.1f,\"duration\":%.1f}",
+                         "type,longitude,latitude,height,duration\nflyTo,%.6f,%.6f,%.1f,%.1f",
                          longitude, latitude, height, duration);
             } else {
                 snprintf(result_text, sizeof(result_text),
@@ -353,8 +354,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
                 int entity_id = entity_counter++;
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addSphere\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":%.1f,\"radius\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,radius,color,name\naddSphere,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
                          entity_id, longitude, latitude, height, radius, color,
                          name[0] ? name : location);
             } else {
@@ -407,16 +407,14 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 int entity_id = entity_counter++;
                 if (heading >= 0) {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"addBox\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                             "\"height\":%.1f,\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f,"
-                             "\"heading\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                             "type,id,longitude,latitude,height,dimensionX,dimensionY,dimensionZ,heading,color,name\n"
+                             "addBox,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                              entity_id, longitude, latitude, height, dim_x, dim_y, dim_z, heading, color,
                              name[0] ? name : location);
                 } else {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"addBox\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                             "\"height\":%.1f,\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f,"
-                             "\"color\":\"%s\",\"name\":\"%s\"}",
+                             "type,id,longitude,latitude,height,dimensionX,dimensionY,dimensionZ,color,name\n"
+                             "addBox,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                              entity_id, longitude, latitude, height, dim_x, dim_y, dim_z, color,
                              name[0] ? name : location);
                 }
@@ -434,7 +432,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
             double heading = 0;
             json_get_number(args_json, "heading", heading);
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"rotateEntity\",\"id\":\"%s\",\"heading\":%.1f}",
+                     "type,id,heading\nrotateEntity,%s,%.1f",
                      entity_id, heading);
         } else {
             strcpy(result_text, "Missing 'id' parameter");
@@ -452,11 +450,11 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             if (scale > 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"resizeEntity\",\"id\":\"%s\",\"scale\":%.2f}",
+                         "type,id,scale\nresizeEntity,%s,%.2f",
                          entity_id, scale);
             } else if (dim_x > 0 || dim_y > 0 || dim_z > 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"resizeEntity\",\"id\":\"%s\",\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f}",
+                         "type,id,dimensionX,dimensionY,dimensionZ\nresizeEntity,%s,%.1f,%.1f,%.1f",
                          entity_id, dim_x, dim_y, dim_z);
             } else {
                 strcpy(result_text, "Missing 'scale' or dimension parameters");
@@ -481,17 +479,17 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 // Absolute position
                 if (height > -999) {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"moveEntity\",\"id\":\"%s\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f}",
+                             "type,id,longitude,latitude,height\nmoveEntity,%s,%.6f,%.6f,%.1f",
                              entity_id, lon, lat, height);
                 } else {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"moveEntity\",\"id\":\"%s\",\"longitude\":%.6f,\"latitude\":%.6f}",
+                             "type,id,longitude,latitude\nmoveEntity,%s,%.6f,%.6f",
                              entity_id, lon, lat);
                 }
             } else if (offset_x != 0 || offset_y != 0 || offset_z != 0) {
                 // Relative offset in meters
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"moveEntity\",\"id\":\"%s\",\"offsetX\":%.1f,\"offsetY\":%.1f,\"offsetZ\":%.1f}",
+                         "type,id,offsetX,offsetY,offsetZ\nmoveEntity,%s,%.1f,%.1f,%.1f",
                          entity_id, offset_x, offset_y, offset_z);
             } else {
                 strcpy(result_text, "Missing position (longitude/latitude) or offset parameters");
@@ -514,11 +512,11 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         int tileset_id = entity_counter++;
         if (ion_asset_id > 0) {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"loadTileset\",\"id\":\"tileset-%d\",\"ionAssetId\":%.0f,\"name\":\"%s\",\"show\":true}",
+                     "type,id,ionAssetId,name,show\nloadTileset,tileset-%d,%.0f,%s,true",
                      tileset_id, ion_asset_id, name[0] ? name : "tileset");
         } else if (url[0] != '\0') {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"loadTileset\",\"id\":\"tileset-%d\",\"url\":\"%s\",\"name\":\"%s\",\"show\":true}",
+                     "type,id,url,name,show\nloadTileset,tileset-%d,%s,%s,true",
                      tileset_id, url, name[0] ? name : "tileset");
         } else {
             strcpy(result_text, "Missing 'ionAssetId' or 'url' parameter");
@@ -536,15 +534,15 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         if (provider[0] != '\0') {
             if (url[0] != '\0') {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"setImagery\",\"provider\":\"%s\",\"url\":\"%s\"}",
+                         "type,provider,url\nsetImagery,%s,%s",
                          provider, url);
             } else if (ion_asset_id > 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"setImagery\",\"provider\":\"%s\",\"ionAssetId\":%.0f}",
+                         "type,provider,ionAssetId\nsetImagery,%s,%.0f",
                          provider, ion_asset_id);
             } else {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"setImagery\",\"provider\":\"%s\"}",
+                         "type,provider\nsetImagery,%s",
                          provider);
             }
         } else {
@@ -563,11 +561,11 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         if (provider[0] != '\0') {
             if (ion_asset_id > 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"setTerrain\",\"provider\":\"%s\",\"ionAssetId\":%.0f,\"exaggeration\":%.2f}",
+                         "type,provider,ionAssetId,exaggeration\nsetTerrain,%s,%.0f,%.2f",
                          provider, ion_asset_id, exaggeration);
             } else {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"setTerrain\",\"provider\":\"%s\",\"exaggeration\":%.2f}",
+                         "type,provider,exaggeration\nsetTerrain,%s,%.2f",
                          provider, exaggeration);
             }
         } else {
@@ -585,7 +583,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
         if (layer_id[0] != '\0') {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"toggleLayerVisibility\",\"id\":\"%s\",\"visible\":%s}",
+                     "type,id,visible\ntoggleLayerVisibility,%s,%s",
                      layer_id, visible ? "true" : "false");
         } else {
             strcpy(result_text, "Missing 'id' parameter");
@@ -605,26 +603,29 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_number(args_json, "outlineWidth", outline_width);
 
         if (entity_id[0] != '\0') {
-            size_t offset = 0;
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               "{\"type\":\"setEntityStyle\",\"id\":\"%s\"", entity_id);
+            // Build CSV header and data dynamically based on which fields are set
+            char csv_header[256];
+            char csv_data[256];
+            size_t h_off = 0, d_off = 0;
+            h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, "type,id");
+            d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, "setEntityStyle,%s", entity_id);
             if (color[0] != '\0') {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"color\":\"%s\"", color);
+                h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",color");
+                d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%s", color);
             }
             if (opacity >= 0) {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"opacity\":%.2f", opacity);
+                h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",opacity");
+                d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%.2f", opacity);
             }
             if (outline_color[0] != '\0') {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"outlineColor\":\"%s\"", outline_color);
+                h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",outlineColor");
+                d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%s", outline_color);
             }
             if (outline_width >= 0) {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"outlineWidth\":%.1f", outline_width);
+                h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",outlineWidth");
+                d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%.1f", outline_width);
             }
-            snprintf(result_text + offset, sizeof(result_text) - offset, "}");
+            snprintf(result_text, sizeof(result_text), "%s\n%s", csv_header, csv_data);
         } else {
             strcpy(result_text, "Missing 'id' parameter");
         }
@@ -638,10 +639,10 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
         if (iso8601[0] != '\0') {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"setTime\",\"iso8601\":\"%s\"}", iso8601);
+                     "type,iso8601\nsetTime,%s", iso8601);
         } else if (julian_date > 0) {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"setTime\",\"julianDate\":%.6f}", julian_date);
+                     "type,julianDate\nsetTime,%.6f", julian_date);
         } else {
             strcpy(result_text, "Missing 'iso8601' or 'julianDate' parameter");
         }
@@ -657,20 +658,24 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_number(args_json, "multiplier", multiplier);
         json_get_number(args_json, "shouldAnimate", should_animate);
 
-        size_t offset = 0;
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                           "{\"type\":\"setClockRange\"");
+        // Build CSV header and data dynamically
+        char csv_header[256];
+        char csv_data[256];
+        size_t h_off = 0, d_off = 0;
+        h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, "type");
+        d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, "setClockRange");
         if (start_time[0] != '\0') {
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               ",\"startTime\":\"%s\"", start_time);
+            h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",startTime");
+            d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%s", start_time);
         }
         if (end_time[0] != '\0') {
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               ",\"endTime\":\"%s\"", end_time);
+            h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",endTime");
+            d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%s", end_time);
         }
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                           ",\"multiplier\":%.2f,\"shouldAnimate\":%s}",
-                           multiplier, should_animate > 0 ? "true" : "false");
+        h_off += snprintf(csv_header + h_off, sizeof(csv_header) - h_off, ",multiplier,shouldAnimate");
+        d_off += snprintf(csv_data + d_off, sizeof(csv_data) - d_off, ",%.2f,%s",
+                          multiplier, should_animate > 0 ? "true" : "false");
+        snprintf(result_text, sizeof(result_text), "%s\n%s", csv_header, csv_data);
     }
     else if (strcmp(tool_name, "listLocations") == 0) {
         char prefix[64] = "";
@@ -679,11 +684,11 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         const Location* locations = get_all_locations();
         size_t count = get_location_count();
 
-        // Build JSON array of locations
+        // Build CSV of locations
         size_t offset = 0;
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset, "[");
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "name,longitude,latitude");
 
-        bool first = true;
         for (size_t i = 0; i < count && offset < sizeof(result_text) - 100; i++) {
             if (locations[i].name == nullptr) continue;
 
@@ -696,17 +701,111 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 }
             }
 
-            if (!first) {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset, ",");
-            }
-            first = false;
-
             offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               "{\"name\":\"%s\",\"longitude\":%.6f,\"latitude\":%.6f}",
+                               "\n%s,%.6f,%.6f",
                                locations[i].name, locations[i].longitude, locations[i].latitude);
         }
+    }
+    else if (strcmp(tool_name, "getTopCitiesByPopulation") == 0) {
+        double count_d = 10;
+        double min_pop = 0;
+        json_get_number(args_json, "count", count_d);
+        json_get_number(args_json, "minPopulation", min_pop);
 
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset, "]");
+        size_t count = static_cast<size_t>(count_d);
+        if (count > 100) count = 100;
+        if (count < 1) count = 10;
+
+        const Location* results[100];
+        size_t num_results = get_top_cities_by_population(results, count, static_cast<int>(min_pop));
+
+        // Build CSV output
+        size_t offset = 0;
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "name,population,longitude,latitude");
+
+        for (size_t i = 0; i < num_results && offset < sizeof(result_text) - 200; i++) {
+            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                               "\n%s,%d,%.6f,%.6f",
+                               results[i]->name, results[i]->population,
+                               results[i]->longitude, results[i]->latitude);
+        }
+    }
+    else if (strcmp(tool_name, "showTopCitiesByPopulation") == 0) {
+        double count_d = 10;
+        double min_radius = 10000;
+        double max_radius = 200000;
+        double base_size = 50000;
+        double min_height = 10000;
+        double max_height = 500000;
+        char color[32] = "cyan";
+        char shape[32] = "circle";
+
+        json_get_number(args_json, "count", count_d);
+        json_get_number(args_json, "minRadius", min_radius);
+        json_get_number(args_json, "maxRadius", max_radius);
+        json_get_number(args_json, "baseSize", base_size);
+        json_get_number(args_json, "minHeight", min_height);
+        json_get_number(args_json, "maxHeight", max_height);
+        if (!json_get_string(args_json, "color", color, sizeof(color)) || color[0] == '\0') {
+            strcpy(color, "cyan");
+        }
+        if (!json_get_string(args_json, "shape", shape, sizeof(shape)) || shape[0] == '\0') {
+            strcpy(shape, "circle");
+        }
+
+        size_t count = static_cast<size_t>(count_d);
+        if (count > 100) count = 100;
+        if (count < 1) count = 10;
+
+        const Location* results[100];
+        size_t num_results = get_top_cities_by_population(results, count, 0);
+
+        bool is_rectangle = (strcmp(shape, "rectangle") == 0 || strcmp(shape, "bar") == 0);
+
+        // Section 1: command metadata
+        size_t offset = 0;
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "type,color,shape\nshowTopCities,%s,%s", color, shape);
+
+        if (num_results > 0) {
+            int max_pop = results[0]->population;
+            int min_pop_val = results[num_results - 1]->population;
+            if (min_pop_val == max_pop) min_pop_val = max_pop / 2;
+
+            if (is_rectangle) {
+                // Section 2: batch data rows for rectangles
+                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                   "\n\nname,population,longitude,latitude,baseSize,extrudedHeight");
+
+                for (size_t i = 0; i < num_results && offset < sizeof(result_text) - 200; i++) {
+                    double pop_ratio = static_cast<double>(results[i]->population - min_pop_val) /
+                                       static_cast<double>(max_pop - min_pop_val);
+                    double ext_height = min_height + pop_ratio * (max_height - min_height);
+
+                    offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                       "\n%s,%d,%.4f,%.4f,%.0f,%.0f",
+                                       results[i]->name, results[i]->population,
+                                       results[i]->longitude, results[i]->latitude,
+                                       base_size, ext_height);
+                }
+            } else {
+                // Section 2: batch data rows for circles
+                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                   "\n\nname,population,longitude,latitude,radius");
+
+                for (size_t i = 0; i < num_results && offset < sizeof(result_text) - 100; i++) {
+                    double pop_ratio = static_cast<double>(results[i]->population - min_pop_val) /
+                                       static_cast<double>(max_pop - min_pop_val);
+                    double radius = min_radius + pop_ratio * (max_radius - min_radius);
+
+                    offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                       "\n%s,%d,%.4f,%.4f,%.0f",
+                                       results[i]->name, results[i]->population,
+                                       results[i]->longitude, results[i]->latitude, radius);
+                }
+            }
+        }
     }
     else if (strcmp(tool_name, "addPolyline") == 0) {
         char positions_json[4096] = "";
@@ -722,11 +821,40 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "name", name, sizeof(name));
 
         int entity_id = entity_counter++;
-        snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"addPolyline\",\"id\":\"entity-%d\",\"positions\":%s,"
-                 "\"color\":\"%s\",\"width\":%.1f,\"clampToGround\":%s,\"name\":\"%s\"}",
-                 entity_id, positions_json, color, width, clamp > 0 ? "true" : "false",
-                 name[0] ? name : "polyline");
+        // Section 1: command metadata
+        size_t offset = 0;
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "type,id,color,width,clampToGround,name\n"
+                           "addPolyline,entity-%d,%s,%.1f,%s,%s",
+                           entity_id, color, width, clamp > 0 ? "true" : "false",
+                           name[0] ? name : "polyline");
+
+        // Section 2: position rows (parse JSON positions array)
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "\n\nlongitude,latitude,height");
+        // Iterate through JSON positions array
+        const char* p = positions_json;
+        while (*p && *p != '[') p++;
+        if (*p) p++;
+        while (*p) {
+            while (*p && *p != '{' && *p != ']') p++;
+            if (*p == ']' || !*p) break;
+            char pos_obj[256];
+            int depth = 0;
+            int pi = 0;
+            for (; *p && pi < (int)sizeof(pos_obj)-1; p++) {
+                pos_obj[pi++] = *p;
+                if (*p == '{') depth++;
+                if (*p == '}') { depth--; if (depth == 0) { p++; break; } }
+            }
+            pos_obj[pi] = '\0';
+            double plon = 0, plat = 0, ph = 0;
+            json_get_number(pos_obj, "longitude", plon);
+            json_get_number(pos_obj, "latitude", plat);
+            json_get_number(pos_obj, "height", ph);
+            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                               "\n%.6f,%.6f,%.1f", plon, plat, ph);
+        }
     }
     else if (strcmp(tool_name, "addPolygon") == 0) {
         char positions_json[4096] = "";
@@ -744,17 +872,46 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "name", name, sizeof(name));
 
         int entity_id = entity_counter++;
+        // Section 1: command metadata
         size_t offset = 0;
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                           "{\"type\":\"addPolygon\",\"id\":\"entity-%d\",\"positions\":%s,"
-                           "\"color\":\"%s\",\"outlineColor\":\"%s\",\"height\":%.1f",
-                           entity_id, positions_json, color, outline_color, height);
         if (extruded_height >= 0) {
             offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               ",\"extrudedHeight\":%.1f", extruded_height);
+                               "type,id,color,outlineColor,height,extrudedHeight,name\n"
+                               "addPolygon,entity-%d,%s,%s,%.1f,%.1f,%s",
+                               entity_id, color, outline_color, height, extruded_height,
+                               name[0] ? name : "polygon");
+        } else {
+            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                               "type,id,color,outlineColor,height,name\n"
+                               "addPolygon,entity-%d,%s,%s,%.1f,%s",
+                               entity_id, color, outline_color, height,
+                               name[0] ? name : "polygon");
         }
-        snprintf(result_text + offset, sizeof(result_text) - offset,
-                 ",\"name\":\"%s\"}", name[0] ? name : "polygon");
+
+        // Section 2: position rows
+        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                           "\n\nlongitude,latitude");
+        const char* p = positions_json;
+        while (*p && *p != '[') p++;
+        if (*p) p++;
+        while (*p) {
+            while (*p && *p != '{' && *p != ']') p++;
+            if (*p == ']' || !*p) break;
+            char pos_obj[256];
+            int depth = 0;
+            int pi = 0;
+            for (; *p && pi < (int)sizeof(pos_obj)-1; p++) {
+                pos_obj[pi++] = *p;
+                if (*p == '{') depth++;
+                if (*p == '}') { depth--; if (depth == 0) { p++; break; } }
+            }
+            pos_obj[pi] = '\0';
+            double plon = 0, plat = 0;
+            json_get_number(pos_obj, "longitude", plon);
+            json_get_number(pos_obj, "latitude", plat);
+            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                               "\n%.6f,%.6f", plon, plat);
+        }
     }
     else if (strcmp(tool_name, "addModel") == 0) {
         double lon = 0, lat = 0, height = 0;
@@ -775,13 +932,13 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         int entity_id = entity_counter++;
         if (ion_asset_id > 0) {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":%.1f,\"ionAssetId\":%.0f,\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,ionAssetId,scale,heading,name\n"
+                     "addModel,entity-%d,%.6f,%.6f,%.1f,%.0f,%.2f,%.1f,%s",
                      entity_id, lon, lat, height, ion_asset_id, scale, heading, name[0] ? name : "model");
         } else {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":%.1f,\"url\":\"%s\",\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,url,scale,heading,name\n"
+                     "addModel,entity-%d,%.6f,%.6f,%.1f,%s,%.2f,%.1f,%s",
                      entity_id, lon, lat, height, url, scale, heading, name[0] ? name : "model");
         }
     }
@@ -804,13 +961,13 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 int entity_id = entity_counter++;
                 if (ion_asset_id > 0) {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                             "\"height\":0,\"ionAssetId\":%.0f,\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                             "type,id,longitude,latitude,height,ionAssetId,scale,heading,name\n"
+                             "addModel,entity-%d,%.6f,%.6f,0,%.0f,%.2f,%.1f,%s",
                              entity_id, longitude, latitude, ion_asset_id, scale, heading, name[0] ? name : location);
                 } else {
                     snprintf(result_text, sizeof(result_text),
-                             "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                             "\"height\":0,\"url\":\"%s\",\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                             "type,id,longitude,latitude,height,url,scale,heading,name\n"
+                             "addModel,entity-%d,%.6f,%.6f,0,%s,%.2f,%.1f,%s",
                              entity_id, longitude, latitude, url, scale, heading, name[0] ? name : location);
                 }
             } else {
@@ -826,7 +983,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
             double duration = 2.0;
             json_get_number(args_json, "duration", duration);
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"flyToEntity\",\"id\":\"%s\",\"duration\":%.1f}",
+                     "type,id,duration\nflyToEntity,%s,%.1f",
                      entity_id, duration);
         } else {
             strcpy(result_text, "Missing 'id' parameter");
@@ -836,7 +993,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         char entity_id[64];
         if (json_get_string(args_json, "id", entity_id, sizeof(entity_id))) {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"showEntity\",\"id\":\"%s\",\"show\":true}", entity_id);
+                     "type,id,show\nshowEntity,%s,true", entity_id);
         } else {
             strcpy(result_text, "Missing 'id' parameter");
         }
@@ -845,7 +1002,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         char entity_id[64];
         if (json_get_string(args_json, "id", entity_id, sizeof(entity_id))) {
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"showEntity\",\"id\":\"%s\",\"show\":false}", entity_id);
+                     "type,id,show\nshowEntity,%s,false", entity_id);
         } else {
             strcpy(result_text, "Missing 'id' parameter");
         }
@@ -854,7 +1011,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         char mode[16] = "3D";
         json_get_string(args_json, "mode", mode, sizeof(mode));
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"setSceneMode\",\"mode\":\"%s\"}", mode);
+                 "type,mode\nsetSceneMode,%s", mode);
     }
     else if (strcmp(tool_name, "setView") == 0) {
         double lon = 0, lat = 0, height = 10000;
@@ -868,13 +1025,12 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_number(args_json, "roll", roll);
 
         snprintf(result_text, sizeof(result_text),
-                 "{\"type\":\"setView\",\"longitude\":%.6f,\"latitude\":%.6f,\"height\":%.1f,"
-                 "\"heading\":%.1f,\"pitch\":%.1f,\"roll\":%.1f}",
+                 "type,longitude,latitude,height,heading,pitch,roll\n"
+                 "setView,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f",
                  lon, lat, height, heading, pitch, roll);
     }
     else if (strcmp(tool_name, "getCamera") == 0) {
-        // Return a command to get camera state - the JS side will populate the actual values
-        snprintf(result_text, sizeof(result_text), "{\"type\":\"getCamera\"}");
+        snprintf(result_text, sizeof(result_text), "type\ngetCamera");
     }
     else if (strcmp(tool_name, "addCircle") == 0) {
         double lon = 0, lat = 0, radius = 1000;
@@ -891,17 +1047,19 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "name", name, sizeof(name));
 
         int entity_id = entity_counter++;
-        size_t offset = 0;
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                           "{\"type\":\"addCircle\",\"id\":\"entity-%d\",\"longitude\":%.6f,"
-                           "\"latitude\":%.6f,\"radius\":%.1f,\"height\":%.1f,\"color\":\"%s\"",
-                           entity_id, lon, lat, radius, height, color);
         if (extruded_height >= 0) {
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               ",\"extrudedHeight\":%.1f", extruded_height);
+            snprintf(result_text, sizeof(result_text),
+                     "type,id,longitude,latitude,radius,height,color,extrudedHeight,name\n"
+                     "addCircle,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%.1f,%s",
+                     entity_id, lon, lat, radius, height, color, extruded_height,
+                     name[0] ? name : "circle");
+        } else {
+            snprintf(result_text, sizeof(result_text),
+                     "type,id,longitude,latitude,radius,height,color,name\n"
+                     "addCircle,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
+                     entity_id, lon, lat, radius, height, color,
+                     name[0] ? name : "circle");
         }
-        snprintf(result_text + offset, sizeof(result_text) - offset,
-                 ",\"name\":\"%s\"}", name[0] ? name : "circle");
     }
     else if (strcmp(tool_name, "addRectangle") == 0) {
         double west = 0, south = 0, east = 0, north = 0;
@@ -919,23 +1077,25 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
         json_get_string(args_json, "name", name, sizeof(name));
 
         int entity_id = entity_counter++;
-        size_t offset = 0;
-        offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                           "{\"type\":\"addRectangle\",\"id\":\"entity-%d\",\"west\":%.6f,"
-                           "\"south\":%.6f,\"east\":%.6f,\"north\":%.6f,\"height\":%.1f,\"color\":\"%s\"",
-                           entity_id, west, south, east, north, height, color);
         if (extruded_height >= 0) {
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               ",\"extrudedHeight\":%.1f", extruded_height);
+            snprintf(result_text, sizeof(result_text),
+                     "type,id,west,south,east,north,height,color,extrudedHeight,name\n"
+                     "addRectangle,entity-%d,%.6f,%.6f,%.6f,%.6f,%.1f,%s,%.1f,%s",
+                     entity_id, west, south, east, north, height, color, extruded_height,
+                     name[0] ? name : "rectangle");
+        } else {
+            snprintf(result_text, sizeof(result_text),
+                     "type,id,west,south,east,north,height,color,name\n"
+                     "addRectangle,entity-%d,%.6f,%.6f,%.6f,%.6f,%.1f,%s,%s",
+                     entity_id, west, south, east, north, height, color,
+                     name[0] ? name : "rectangle");
         }
-        snprintf(result_text + offset, sizeof(result_text) - offset,
-                 ",\"name\":\"%s\"}", name[0] ? name : "rectangle");
     }
     else if (strcmp(tool_name, "playAnimation") == 0) {
-        snprintf(result_text, sizeof(result_text), "{\"type\":\"playAnimation\"}");
+        snprintf(result_text, sizeof(result_text), "type\nplayAnimation");
     }
     else if (strcmp(tool_name, "pauseAnimation") == 0) {
-        snprintf(result_text, sizeof(result_text), "{\"type\":\"pauseAnimation\"}");
+        snprintf(result_text, sizeof(result_text), "type\npauseAnimation");
     }
     // "Here" tools - use camera target position
     else if (strcmp(tool_name, "addSphereHere") == 0) {
@@ -959,8 +1119,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addSphere\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":%.1f,\"radius\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,radius,color,name\n"
+                     "addSphere,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
                      entity_id, camera_target_longitude, camera_target_latitude,
                      height, radius, color, name[0] ? name : "sphere");
         }
@@ -990,9 +1150,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addBox\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":%.1f,\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f,"
-                     "\"heading\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,dimensionX,dimensionY,dimensionZ,heading,color,name\n"
+                     "addBox,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                      entity_id, camera_target_longitude, camera_target_latitude,
                      height, dim_x, dim_y, dim_z, heading, color, name[0] ? name : "box");
         }
@@ -1009,8 +1168,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addPoint\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"color\":\"%s\",\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,color,name\n"
+                     "addPoint,entity-%d,%.6f,%.6f,%s,%s",
                      entity_id, camera_target_longitude, camera_target_latitude,
                      color, name[0] ? name : "point");
         }
@@ -1024,8 +1183,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addLabel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"text\":\"%s\"}",
+                     "type,id,longitude,latitude,text\n"
+                     "addLabel,entity-%d,%.6f,%.6f,%s",
                      entity_id, camera_target_longitude, camera_target_latitude, text);
         }
     }
@@ -1045,9 +1204,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addCylinder\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":0,\"topRadius\":%.1f,\"bottomRadius\":%.1f,\"cylinderHeight\":%.1f,"
-                     "\"color\":\"%s\",\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,topRadius,bottomRadius,cylinderHeight,color,name\n"
+                     "addCylinder,entity-%d,%.6f,%.6f,0,%.1f,%.1f,%.1f,%s,%s",
                      entity_id, camera_target_longitude, camera_target_latitude,
                      top_radius, bottom_radius, cylinder_height, color, name[0] ? name : "cylinder");
         }
@@ -1067,18 +1225,19 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
             json_get_string(args_json, "name", name, sizeof(name));
 
             int entity_id = entity_counter++;
-            size_t offset = 0;
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               "{\"type\":\"addCircle\",\"id\":\"entity-%d\",\"longitude\":%.6f,"
-                               "\"latitude\":%.6f,\"radius\":%.1f,\"height\":%.1f,\"color\":\"%s\"",
-                               entity_id, camera_target_longitude, camera_target_latitude,
-                               radius, height, color);
             if (extruded_height >= 0) {
-                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"extrudedHeight\":%.1f", extruded_height);
+                snprintf(result_text, sizeof(result_text),
+                         "type,id,longitude,latitude,radius,height,color,extrudedHeight,name\n"
+                         "addCircle,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%.1f,%s",
+                         entity_id, camera_target_longitude, camera_target_latitude,
+                         radius, height, color, extruded_height, name[0] ? name : "circle");
+            } else {
+                snprintf(result_text, sizeof(result_text),
+                         "type,id,longitude,latitude,radius,height,color,name\n"
+                         "addCircle,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
+                         entity_id, camera_target_longitude, camera_target_latitude,
+                         radius, height, color, name[0] ? name : "circle");
             }
-            snprintf(result_text + offset, sizeof(result_text) - offset,
-                     ",\"name\":\"%s\"}", name[0] ? name : "circle");
         }
     }
     else if (strcmp(tool_name, "addModelHere") == 0) {
@@ -1099,14 +1258,14 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
             int entity_id = entity_counter++;
             if (ion_asset_id > 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":0,\"ionAssetId\":%.0f,\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,ionAssetId,scale,heading,name\n"
+                         "addModel,entity-%d,%.6f,%.6f,0,%.0f,%.2f,%.1f,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          ion_asset_id, scale, heading, name[0] ? name : "model");
             } else {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":0,\"url\":\"%s\",\"scale\":%.2f,\"heading\":%.1f,\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,url,scale,heading,name\n"
+                         "addModel,entity-%d,%.6f,%.6f,0,%s,%.2f,%.1f,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          url, scale, heading, name[0] ? name : "model");
             }
@@ -1136,35 +1295,34 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
             double lat_deg_per_meter = 1.0 / 111000.0;
             double lon_deg_per_meter = lat_deg_per_meter / (cos(camera_target_latitude * 3.14159265358979 / 180.0) + 0.001);
 
-            char positions_json[2048];
-            size_t pos_offset = 0;
-            pos_offset += snprintf(positions_json + pos_offset, sizeof(positions_json) - pos_offset, "[");
+            int entity_id = entity_counter++;
+            // Section 1: command metadata
+            size_t offset = 0;
+            if (extruded_height >= 0) {
+                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                   "type,id,color,height,extrudedHeight,name\n"
+                                   "addPolygon,entity-%d,%s,%.1f,%.1f,%s",
+                                   entity_id, color, height, extruded_height,
+                                   name[0] ? name : "polygon");
+            } else {
+                offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                                   "type,id,color,height,name\n"
+                                   "addPolygon,entity-%d,%s,%.1f,%s",
+                                   entity_id, color, height,
+                                   name[0] ? name : "polygon");
+            }
 
+            // Section 2: position rows
+            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
+                               "\n\nlongitude,latitude");
             for (int i = 0; i < (int)sides; i++) {
                 double angle = 2.0 * 3.14159265358979 * i / sides;
                 double dx = radius * cos(angle) * lon_deg_per_meter;
                 double dy = radius * sin(angle) * lat_deg_per_meter;
-                if (i > 0) {
-                    pos_offset += snprintf(positions_json + pos_offset, sizeof(positions_json) - pos_offset, ",");
-                }
-                pos_offset += snprintf(positions_json + pos_offset, sizeof(positions_json) - pos_offset,
-                                       "{\"longitude\":%.6f,\"latitude\":%.6f}",
-                                       camera_target_longitude + dx, camera_target_latitude + dy);
-            }
-            pos_offset += snprintf(positions_json + pos_offset, sizeof(positions_json) - pos_offset, "]");
-
-            int entity_id = entity_counter++;
-            size_t offset = 0;
-            offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                               "{\"type\":\"addPolygon\",\"id\":\"entity-%d\",\"positions\":%s,"
-                               "\"color\":\"%s\",\"height\":%.1f",
-                               entity_id, positions_json, color, height);
-            if (extruded_height >= 0) {
                 offset += snprintf(result_text + offset, sizeof(result_text) - offset,
-                                   ",\"extrudedHeight\":%.1f", extruded_height);
+                                   "\n%.6f,%.6f",
+                                   camera_target_longitude + dx, camera_target_latitude + dy);
             }
-            snprintf(result_text + offset, sizeof(result_text) - offset,
-                     ",\"name\":\"%s\"}", name[0] ? name : "polygon");
         }
     }
     else if (strcmp(tool_name, "addEntityHere") == 0) {
@@ -1191,54 +1349,52 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                 if (radius > 1000) radius = 100;
                 if (radius < 1) radius = 50;
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addSphere\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":%.1f,\"radius\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,radius,color,name\n"
+                         "addSphere,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          height, radius, color, name[0] ? name : "sphere");
             }
             else if (strcmp(entity_type, "box") == 0) {
                 double dim = radius > 0 ? radius : 50;
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addBox\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":%.1f,\"dimensionX\":%.1f,\"dimensionY\":%.1f,\"dimensionZ\":%.1f,"
-                         "\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,dimensionX,dimensionY,dimensionZ,color,name\n"
+                         "addBox,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%s,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          dim / 2.0, dim, dim, dim, color, name[0] ? name : "box");
             }
             else if (strcmp(entity_type, "cylinder") == 0) {
                 double r = radius > 0 ? radius : 50;
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addCylinder\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":0,\"topRadius\":%.1f,\"bottomRadius\":%.1f,\"cylinderHeight\":%.1f,"
-                         "\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,topRadius,bottomRadius,cylinderHeight,color,name\n"
+                         "addCylinder,entity-%d,%.6f,%.6f,0,%.1f,%.1f,%.1f,%s,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          r, r, r * 2, color, name[0] ? name : "cylinder");
             }
             else if (strcmp(entity_type, "point") == 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addPoint\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,color,name\n"
+                         "addPoint,entity-%d,%.6f,%.6f,%s,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          color, name[0] ? name : "point");
             }
             else if (strcmp(entity_type, "label") == 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addLabel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"text\":\"%s\"}",
+                         "type,id,longitude,latitude,text\n"
+                         "addLabel,entity-%d,%.6f,%.6f,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          text[0] ? text : "Label");
             }
             else if (strcmp(entity_type, "circle") == 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addCircle\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"radius\":%.1f,\"height\":%.1f,\"color\":\"%s\",\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,radius,height,color,name\n"
+                         "addCircle,entity-%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          radius > 0 ? radius : 100, height, color, name[0] ? name : "circle");
             }
             else if (strcmp(entity_type, "model") == 0) {
                 snprintf(result_text, sizeof(result_text),
-                         "{\"type\":\"addModel\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                         "\"height\":%.1f,\"url\":\"\",\"scale\":1.0,\"heading\":0,\"name\":\"%s\"}",
+                         "type,id,longitude,latitude,height,url,scale,heading,name\n"
+                         "addModel,entity-%d,%.6f,%.6f,%.1f,,1.0,0,%s",
                          entity_id, camera_target_longitude, camera_target_latitude,
                          height, name[0] ? name : "model");
             }
@@ -1289,10 +1445,8 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
 
             int entity_id = entity_counter++;
             snprintf(result_text, sizeof(result_text),
-                     "{\"type\":\"addSensorCone\",\"id\":\"entity-%d\",\"longitude\":%.6f,\"latitude\":%.6f,"
-                     "\"height\":%.1f,\"radius\":%.1f,\"horizontalAngle\":%.1f,\"verticalAngle\":%.1f,"
-                     "\"heading\":%.1f,\"pitch\":%.1f,\"innerRadius\":%.1f,\"color\":\"%s\",\"opacity\":%.2f,"
-                     "\"name\":\"%s\"}",
+                     "type,id,longitude,latitude,height,radius,horizontalAngle,verticalAngle,heading,pitch,innerRadius,color,opacity,name\n"
+                     "addSensorCone,entity-%d,%.6f,%.6f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%s,%.2f,%s",
                      entity_id, camera_target_longitude, camera_target_latitude,
                      height, radius, horizontal_angle, vertical_angle,
                      heading, pitch, inner_radius, color, opacity,
@@ -1305,7 +1459,7 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                  "Tool '%s' executed with args: %s", tool_name, args_json);
     }
 
-    char result[16384];
+    char result[65536];
     format_tool_result(result_text, false, result, sizeof(result));
     return create_success_response(id, result, response, response_size);
 }

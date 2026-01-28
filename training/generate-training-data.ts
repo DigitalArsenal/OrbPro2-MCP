@@ -1,6 +1,6 @@
 /**
  * Training Data Generator v2.0
- * Generates comprehensive training examples for fine-tuning the Cesium SLM
+ * Generates comprehensive training examples for fine-tuning the OrbPro2 MCP
  * Target: 150,000+ varied examples covering ALL 80+ MCP tools
  *
  * FEATURES:

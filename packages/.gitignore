@@ -5,7 +5,7 @@ emsdk/
 mcp-server-cpp/build/
 mcp-server-cpp/dist/
 
-# Generated FlatBuffers headers
+# Generated headers
 mcp-server-cpp/include/generated/
 
 # Node modules (if any packages have them)

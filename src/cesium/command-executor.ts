@@ -224,6 +224,8 @@ export class CesiumCommandExecutor {
           return this.executeCameraCinematicFlight(command);
         case 'entity.add':
           return await this.executeEntityAdd(command);
+        case 'batch.addEntities':
+          return await this.executeBatchAddEntities(command);
         case 'entity.remove':
           return this.executeEntityRemove(command);
         case 'entity.update':
@@ -579,6 +581,43 @@ export class CesiumCommandExecutor {
       return {
         success: false,
         message: `Failed to add sensor cone: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Add multiple entities in a batch (for showTopCities, etc.)
+   */
+  private async executeBatchAddEntities(command: { type: 'batch.addEntities'; entities: Array<Record<string, unknown>> }): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      const entities = command.entities;
+      console.log(`[BatchAdd] Adding ${entities.length} entities`);
+
+      // Create a single CZML document with all entities
+      const czml: unknown[] = [
+        { id: 'document', name: 'BatchEntities', version: '1.0' },
+        ...entities,
+      ];
+
+      const dataSource = await Cesium.CzmlDataSource.load(czml);
+      await this.viewer.dataSources.add(dataSource);
+
+      // Store reference for potential removal
+      const batchId = `batch-${Date.now()}`;
+      this.loadedDataSources.set(batchId, dataSource);
+
+      console.log(`[BatchAdd] Successfully added ${entities.length} entities`);
+
+      return {
+        success: true,
+        message: `Added ${entities.length} entities`,
+        data: { batchId, count: entities.length },
+      };
+    } catch (error) {
+      console.error('[BatchAdd] Error adding batch entities:', error);
+      return {
+        success: false,
+        message: `Failed to add batch entities: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }

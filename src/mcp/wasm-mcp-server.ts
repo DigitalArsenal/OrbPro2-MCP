@@ -224,27 +224,21 @@ export class WasmMCPServer {
       // The tool result is in result.content[0].text
       const toolOutput = result.content[0].text;
 
-      // Try to parse as JSON (command output from WASM)
-      let commandData: Record<string, unknown> | null = null;
-      try {
-        commandData = JSON.parse(toolOutput);
-        console.log(`[WasmMCPServer] Tool '${name}' returned:`, commandData);
-      } catch {
-        // Not JSON, just text output
-        console.log(`[WasmMCPServer] Tool '${name}' returned text:`, toolOutput);
-      }
+      // Try to parse as CSV (command output from WASM)
+      const csvResult = this.parseCSV(toolOutput);
 
-      // If the output is a CesiumCommand (has a "type" field), execute it
-      if (commandData && typeof commandData === 'object' && 'type' in commandData) {
-        // Convert WASM output format to executor format
-        const cesiumCommand = this.mapWasmCommandToExecutor(commandData);
+      if (csvResult && 'type' in csvResult.meta) {
+        console.log(`[WasmMCPServer] Tool '${name}' returned CSV:`, csvResult.meta.type, csvResult.rows ? `(${csvResult.rows.length} rows)` : '');
+
+        // Convert WASM CSV output to executor format
+        const cesiumCommand = this.mapWasmCommandToExecutor(csvResult.meta, csvResult.rows);
         console.log(`[WasmMCPServer] Mapped to CesiumCommand:`, cesiumCommand);
 
         // Execute the command if we have an executor
         if (this.executeCommand) {
           try {
-            const result = await this.executeCommand(cesiumCommand);
-            console.log(`[WasmMCPServer] Execution result:`, result);
+            const execResult = await this.executeCommand(cesiumCommand);
+            console.log(`[WasmMCPServer] Execution result:`, execResult);
           } catch (execError) {
             console.error(`[WasmMCPServer] Command execution failed:`, execError);
           }
@@ -254,16 +248,16 @@ export class WasmMCPServer {
 
         return {
           success: true,
-          message: `Executed ${commandData.type}`,
+          message: `Executed ${csvResult.meta.type}`,
           data: cesiumCommand
         };
       }
 
       // Plain text output (like location resolution results)
+      console.log(`[WasmMCPServer] Tool '${name}' returned text:`, toolOutput);
       return {
         success: true,
         message: toolOutput,
-        data: commandData
       };
 
     } catch (error) {
@@ -355,7 +349,7 @@ export class WasmMCPServer {
    * WASM uses simple types like 'flyTo', 'addBox'
    * Executor expects namespaced types like 'camera.flyTo', 'entity.add'
    */
-  private mapWasmCommandToExecutor(wasmOutput: Record<string, unknown>): CesiumCommand {
+  private mapWasmCommandToExecutor(wasmOutput: Record<string, unknown>, rows?: Array<Record<string, unknown>>): CesiumCommand {
     const type = wasmOutput.type as string;
 
     // Camera commands
@@ -610,10 +604,11 @@ export class WasmMCPServer {
     }
 
     if (type === 'addPolyline') {
-      const positions = wasmOutput.positions as Array<{ longitude: number; latitude: number; height?: number }>;
+      // Positions come from CSV batch rows (section 2)
+      const positions = rows || [];
       const degreesArray: number[] = [];
-      for (const pos of positions || []) {
-        degreesArray.push(pos.longitude, pos.latitude, pos.height || 0);
+      for (const pos of positions) {
+        degreesArray.push(pos.longitude as number, pos.latitude as number, (pos.height as number) || 0);
       }
       return {
         type: 'entity.add',
@@ -631,10 +626,11 @@ export class WasmMCPServer {
     }
 
     if (type === 'addPolygon') {
-      const positions = wasmOutput.positions as Array<{ longitude: number; latitude: number }>;
+      // Positions come from CSV batch rows (section 2)
+      const positions = rows || [];
       const degreesArray: number[] = [];
-      for (const pos of positions || []) {
-        degreesArray.push(pos.longitude, pos.latitude, 0);
+      for (const pos of positions) {
+        degreesArray.push(pos.longitude as number, pos.latitude as number, 0);
       }
       return {
         type: 'entity.add',
@@ -696,6 +692,77 @@ export class WasmMCPServer {
           }
         }
       } as CesiumCommand;
+    }
+
+    // Batch add shapes for showing cities by population
+    if (type === 'showTopCities') {
+      const cityRows = rows || [];
+      const color = wasmOutput.color as string || 'cyan';
+      const shape = wasmOutput.shape as string || 'circle';
+      const colorRgba = this.colorToRgba(color);
+      // Make shapes semi-transparent
+      colorRgba[3] = 150;
+
+      const isRectangle = shape === 'rectangle' || shape === 'bar';
+
+      const entities = cityRows.map((city, index) => {
+        const lon = city.longitude as number;
+        const lat = city.latitude as number;
+        const pop = city.population as number;
+        const name = `${city.name} (pop: ${pop.toLocaleString()})`;
+        const id = `city-pop-${index}-${Date.now()}`;
+
+        if (isRectangle) {
+          // Create extruded rectangle (3D bar)
+          const baseSize = city.baseSize as number || 50000;
+          const extrudedHeight = city.extrudedHeight as number || 10000;
+          // Convert meters to degrees (approximate)
+          const halfLatDeg = (baseSize / 2) / 111000;
+          const halfLonDeg = (baseSize / 2) / (111000 * Math.cos(lat * Math.PI / 180));
+          return {
+            id,
+            name,
+            rectangle: {
+              coordinates: {
+                wsenDegrees: [
+                  lon - halfLonDeg,
+                  lat - halfLatDeg,
+                  lon + halfLonDeg,
+                  lat + halfLatDeg
+                ]
+              },
+              height: 0,
+              extrudedHeight,
+              material: { solidColor: { color: { rgba: colorRgba } } },
+              outline: true,
+              outlineColor: { rgba: [255, 255, 255, 200] },
+            }
+          };
+        } else {
+          // Create flat circle (ellipse)
+          const radius = city.radius as number || 10000;
+          return {
+            id,
+            name,
+            position: {
+              cartographicDegrees: [lon, lat, 0]
+            },
+            ellipse: {
+              semiMajorAxis: radius,
+              semiMinorAxis: radius,
+              height: 0,
+              material: { solidColor: { color: { rgba: colorRgba } } },
+              outline: true,
+              outlineColor: { rgba: [255, 255, 255, 255] },
+            }
+          };
+        }
+      });
+
+      return {
+        type: 'batch.addEntities',
+        entities,
+      } as unknown as CesiumCommand;
     }
 
     if (type === 'addModel') {
@@ -834,6 +901,66 @@ export class WasmMCPServer {
     // Default: pass through as-is (may fail if executor doesn't support it)
     console.warn(`[WasmMCPServer] Unknown command type: ${type}, passing through`);
     return wasmOutput as unknown as CesiumCommand;
+  }
+
+  /**
+   * Parse CSV output from WASM into structured data.
+   * Format: header row + data row (section 1 = command metadata).
+   * Optional second section separated by blank line for batch data rows.
+   */
+  private parseCSV(csv: string): { meta: Record<string, unknown>; rows?: Array<Record<string, unknown>> } | null {
+    const sections = csv.split('\n\n');
+    const firstSection = sections[0];
+    if (!firstSection) return null;
+
+    const metaLines = firstSection.split('\n').filter(l => l.length > 0);
+    if (metaLines.length < 2) return null;
+
+    const headerLine = metaLines[0]!;
+    const valueLine = metaLines[1]!;
+    const headers = headerLine.split(',');
+    const values = valueLine.split(',');
+    if (headers.length === 0 || headers.length !== values.length) return null;
+
+    const meta: Record<string, unknown> = {};
+    for (let i = 0; i < headers.length; i++) {
+      const key = headers[i]!;
+      meta[key] = this.csvAutoType(values[i] ?? '');
+    }
+
+    // Parse second section if present (batch data rows)
+    const secondSection = sections[1];
+    if (secondSection && secondSection.trim().length > 0) {
+      const dataLines = secondSection.split('\n').filter(l => l.length > 0);
+      if (dataLines.length >= 2) {
+        const dataHeaders = dataLines[0]!.split(',');
+        const rows: Array<Record<string, unknown>> = [];
+        for (let i = 1; i < dataLines.length; i++) {
+          const vals = dataLines[i]!.split(',');
+          const row: Record<string, unknown> = {};
+          for (let j = 0; j < dataHeaders.length; j++) {
+            const dKey = dataHeaders[j]!;
+            row[dKey] = this.csvAutoType(vals[j] ?? '');
+          }
+          rows.push(row);
+        }
+        return { meta, rows };
+      }
+    }
+
+    return { meta };
+  }
+
+  /**
+   * Auto-type a CSV value: booleans, numbers, or strings
+   */
+  private csvAutoType(value: string): string | number | boolean {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === '') return '';
+    const num = Number(value);
+    if (!isNaN(num)) return num;
+    return value;
   }
 
   /**

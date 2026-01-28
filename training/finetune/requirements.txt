@@ -1,4 +1,4 @@
-# Fine-tuning dependencies for Cesium SLM
+# Fine-tuning dependencies for OrbPro2 MCP
 # Install with: pip install -r requirements.txt
 
 # Core ML libraries

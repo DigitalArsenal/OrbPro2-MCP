@@ -1,4 +1,4 @@
-# Cesium SLM Fine-Tuning Pipeline
+# OrbPro2 MCP Fine-Tuning Pipeline
 
 Fine-tune small language models for CesiumJS natural language control.
 

@@ -1,6 +1,6 @@
-# Cesium SLM API Reference
+# OrbPro2 MCP API Reference
 
-Comprehensive API documentation for the Cesium SLM (Small Language Model) project - a browser-based natural language interface for controlling CesiumJS 3D globe visualization.
+Comprehensive API documentation for the OrbPro2 MCP (Small Language Model) project - a browser-based natural language interface for controlling CesiumJS 3D globe visualization.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Comprehensive API documentation for the Cesium SLM (Small Language Model) projec
 
 ### Project Architecture
 
-The Cesium SLM project provides a complete pipeline for natural language control of a CesiumJS 3D globe:
+The OrbPro2 MCP project provides a complete pipeline for natural language control of a CesiumJS 3D globe:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

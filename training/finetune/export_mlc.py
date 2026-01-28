@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MLC LLM Export Script for Cesium SLM
+MLC LLM Export Script for OrbPro2 MCP
 
 Converts fine-tuned models to MLC format for WebGPU inference in browser.
 Supports quantization for optimal browser performance.
@@ -194,7 +194,7 @@ def create_model_lib_wasm(output_dir: str, quantization: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export Cesium SLM model to MLC format for WebGPU"
+        description="Export OrbPro2 MCP model to MLC format for WebGPU"
     )
 
     parser.add_argument("--model", type=str, required=True,

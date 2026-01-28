@@ -1,4 +1,4 @@
-# MLC-LLM Compilation Environment for OrbPro Cesium SLM
+# MLC-LLM Compilation Environment for OrbPro OrbPro2 MCP
 # This Dockerfile is static - don't regenerate it to preserve layer caching
 FROM ubuntu:22.04
 

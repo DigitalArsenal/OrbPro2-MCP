@@ -1,5 +1,5 @@
 #!/bin/bash
-# Upload OrbPro Cesium SLM to HuggingFace
+# Upload OrbPro OrbPro2 MCP to HuggingFace
 # Run this AFTER testing the model locally
 
 set -e
@@ -19,7 +19,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 MODEL_DIR="${PROJECT_DIR}/mlc-models/${MODEL_NAME}"
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║     Upload OrbPro Cesium SLM to HuggingFace               ║${NC}"
+echo -e "${GREEN}║     Upload OrbPro OrbPro2 MCP to HuggingFace               ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -63,7 +63,7 @@ echo "This may take a few minutes depending on your connection."
 echo ""
 
 cd "${MODEL_DIR}"
-huggingface-cli upload "${HF_USERNAME}/${MODEL_NAME}" . --commit-message "Upload OrbPro Cesium SLM model"
+huggingface-cli upload "${HF_USERNAME}/${MODEL_NAME}" . --commit-message "Upload OrbPro OrbPro2 MCP model"
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"

@@ -1,5 +1,5 @@
 /**
- * Cesium SLM - Main Application
+ * OrbPro2 MCP - Main Application
  * Integrates WebLLM, MCP Server, and CesiumJS for natural language globe control
  */
 

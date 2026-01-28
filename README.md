@@ -1,4 +1,4 @@
-# Cesium SLM - Browser-based Natural Language Globe Control
+# OrbPro2 MCP - Browser-based Natural Language Globe Control
 
 A small language model (SLM) system that runs entirely in the browser using WebGPU and allows users to control a CesiumJS 3D globe using natural language commands.
 

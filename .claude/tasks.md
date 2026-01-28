@@ -1,4 +1,4 @@
-# Cesium SLM - Architecture & Development Tasks
+# OrbPro2 MCP - Architecture & Development Tasks
 
 This document tracks the architectural improvements and development tasks for the Cesium Small Language Model project.
 
@@ -65,30 +65,7 @@ Location Record (28 bytes):
 
 ---
 
-## PRIORITY 3: Replace JSON with FlatBuffers
-
-Replace JSON-RPC with aligned binary protocol using FlatBuffers for better performance.
-
-### Tasks
-- [ ] Define FlatBuffer schemas for MCP protocol
-  - Tool definitions schema
-  - Tool call request/response schema
-  - Camera state schema
-  - Entity command schema
-- [ ] Compile schemas with `flatc-wasm`
-- [ ] Update C++ MCP server to use FlatBuffers
-- [ ] Update TypeScript wrapper for FlatBuffer serialization
-- [ ] Add schema version negotiation
-
-### Benefits
-- Zero-copy deserialization
-- Smaller message sizes
-- Faster parsing
-- Schema evolution support
-
----
-
-## PRIORITY 4: Comprehensive City Database
+## PRIORITY 3: Comprehensive City Database
 
 ### Data Sources (choose one or combine)
 1. **US Census Bureau API** - Population data (no coordinates)
@@ -117,7 +94,7 @@ npm run build:location-db
 
 ---
 
-## PRIORITY 5: Model Fine-Tuning Pipeline
+## PRIORITY 4: Model Fine-Tuning Pipeline
 
 ### Completed
 - [x] Basic training data generator
@@ -126,7 +103,6 @@ npm run build:location-db
 
 ### To Do
 - [ ] Update training data with new "Here" tools
-- [ ] Add FlatBuffer tool definitions to training data
 - [ ] Train 1.5B and 3B parameter variants
 - [ ] Evaluate on compound command test suite
 

@@ -1,6 +1,6 @@
-# Cesium SLM Deployment Guide
+# OrbPro2 MCP Deployment Guide
 
-This comprehensive guide covers everything you need to deploy the Cesium SLM (Small Language Model) application, from local development to production hosting on various platforms.
+This comprehensive guide covers everything you need to deploy the OrbPro2 MCP (Small Language Model) application, from local development to production hosting on various platforms.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This comprehensive guide covers everything you need to deploy the Cesium SLM (Sm
 
 ### Node.js Version Requirements
 
-Cesium SLM requires **Node.js 18.0.0 or later**. This is specified in the `engines` field of `package.json`.
+OrbPro2 MCP requires **Node.js 18.0.0 or later**. This is specified in the `engines` field of `package.json`.
 
 To check your current Node.js version:
 
@@ -43,7 +43,7 @@ fnm use 18
 
 ### Browser Compatibility (WebGPU Requirements)
 
-Cesium SLM uses WebGPU to run AI models directly in the browser. WebGPU is a modern graphics and compute API that provides significant performance benefits over WebGL.
+OrbPro2 MCP uses WebGPU to run AI models directly in the browser. WebGPU is a modern graphics and compute API that provides significant performance benefits over WebGL.
 
 **Supported Browsers:**
 
@@ -86,7 +86,7 @@ Cesium Ion provides access to global 3D geospatial data including terrain, image
    - Log in to your Cesium Ion dashboard
    - Navigate to "Access Tokens" in the left sidebar
    - Click "Create Token"
-   - Give your token a descriptive name (e.g., "Cesium SLM Production")
+   - Give your token a descriptive name (e.g., "OrbPro2 MCP Production")
    - Select the appropriate scopes (at minimum, select "assets:read")
    - Copy the generated token
 
@@ -232,7 +232,7 @@ npm run lint
 
 ## Vercel Deployment
 
-Vercel is an excellent choice for deploying Cesium SLM due to its seamless integration with Vite and automatic HTTPS.
+Vercel is an excellent choice for deploying OrbPro2 MCP due to its seamless integration with Vite and automatic HTTPS.
 
 ### Step-by-Step Guide
 
@@ -839,7 +839,7 @@ Add to your `index.html`:
 
 ## Model Caching Strategies
 
-The SLM models used by Cesium SLM can be large (hundreds of MB to several GB). Effective caching is crucial for performance.
+The SLM models used by OrbPro2 MCP can be large (hundreds of MB to several GB). Effective caching is crucial for performance.
 
 ### Browser Cache Settings
 

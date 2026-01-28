@@ -242,7 +242,7 @@ size_t create_error_response(const char* id, ErrorCode code, const char* message
 }
 
 size_t format_tool_result(const char* text, bool is_error, char* output, size_t output_size) {
-    char escaped_text[8192];
+    char escaped_text[32768];
     json_escape_string(text, escaped_text, sizeof(escaped_text));
 
     if (is_error) {

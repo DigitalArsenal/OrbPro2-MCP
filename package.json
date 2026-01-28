@@ -14,7 +14,8 @@
     "asbuild:release": "asc wasm/assembly/index.ts --target release --outFile wasm/build/mcp.wasm --textFile wasm/build/mcp.wat --exportRuntime --optimize",
     "asbuild": "npm run asbuild:debug && npm run asbuild:release",
     "build:locations": "node scripts/build-location-database.mjs",
-    "merge:locations": "node scripts/merge-location-databases.mjs"
+    "merge:locations": "node scripts/merge-location-databases.mjs",
+    "fetch:geonames": "node scripts/fetch-geonames.mjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.78",

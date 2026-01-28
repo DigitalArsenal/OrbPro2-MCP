@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LoRA Fine-tuning Script for Cesium SLM
+LoRA Fine-tuning Script for OrbPro2 MCP
 
 Fine-tunes Qwen2.5 or SmolLM models using LoRA for efficient training.
 Optimized for instruction-following on CesiumJS commands.
@@ -154,7 +154,7 @@ def preprocess_data(examples, tokenizer, max_length: int, format_prompt):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune LLM with LoRA for Cesium SLM")
+    parser = argparse.ArgumentParser(description="Fine-tune LLM with LoRA for OrbPro2 MCP")
 
     # Model arguments
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-0.5B-Instruct")

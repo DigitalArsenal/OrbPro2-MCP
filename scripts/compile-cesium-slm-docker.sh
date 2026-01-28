@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build and run MLC compilation for OrbPro Cesium SLM via Docker
+# Build and run MLC compilation for OrbPro OrbPro2 MCP via Docker
 # This is the recommended method - no local dependencies required
 #
 # Caching:
@@ -27,7 +27,7 @@ QUANTIZATION="q4f16_1"
 CONTEXT_WINDOW=4096
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  OrbPro Cesium SLM - Docker MLC Compilation                ║${NC}"
+echo -e "${GREEN}║  OrbPro OrbPro2 MCP - Docker MLC Compilation                ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

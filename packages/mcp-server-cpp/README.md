@@ -8,7 +8,6 @@ High-performance MCP (Model Context Protocol) server for CesiumJS control, compi
 - **Location Aliases**: Supports nicknames ("Beantown" for Boston, "Chi-town" for Chicago)
 - **Fast JSON-RPC**: Lightweight JSON-RPC 2.0 parser optimized for WASM
 - **pthreads Support**: Built with pthread support for multi-threaded operations
-- **FlatBuffers Ready**: Schemas defined for binary protocol support
 
 ## Building
 
@@ -21,9 +20,6 @@ High-performance MCP (Model Context Protocol) server for CesiumJS control, compi
 ### Build Commands
 
 ```bash
-# Generate headers from FlatBuffers schemas
-npm run generate-headers
-
 # Build WebAssembly
 npm run build
 
@@ -88,12 +84,9 @@ packages/mcp-server-cpp/
 │   ├── location_database.cpp
 │   ├── json_rpc.cpp
 │   └── main.cpp
-├── schemas/              # FlatBuffers schemas
-│   └── mcp_protocol.fbs
 ├── scripts/              # Build scripts
 │   ├── build-wasm.sh
-│   ├── build-native.sh
-│   └── generate-headers.mjs
+│   └── build-native.sh
 ├── dist/                 # Build output
 │   ├── cesium-mcp-wasm.js
 │   └── cesium-mcp-wasm.wasm

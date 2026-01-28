@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Data Preparation Script for Cesium SLM Fine-tuning
+Data Preparation Script for OrbPro2 MCP Fine-tuning
 
 Converts JSONL training data to format suitable for instruction tuning.
 Supports multiple output formats: HuggingFace datasets, alpaca, sharegpt.
@@ -155,7 +155,7 @@ def save_as_hf_dataset(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Prepare training data for Cesium SLM fine-tuning"
+        description="Prepare training data for OrbPro2 MCP fine-tuning"
     )
     parser.add_argument(
         "--input", "-i",
