@@ -22,8 +22,8 @@ OUTPUT_DIR="${PROJECT_DIR}/mlc-models"
 MODEL_DIR="${PROJECT_DIR}/training/cesium-qwen-lora-mlx/merged"
 CACHE_DIR="${PROJECT_DIR}/.cache/mlc-compile"
 
-OUTPUT_NAME="OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC"
-QUANTIZATION="q4f16_1"
+OUTPUT_NAME="OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC"
+QUANTIZATION="q4f32_1"
 CONTEXT_WINDOW=4096
 
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
@@ -144,38 +144,64 @@ docker run --rm --platform linux/amd64 \
         cp /workspace/model/special_tokens_map.json ./${OUTPUT_NAME}/ 2>/dev/null || true
 
         echo ''
-        echo '=== Creating WebLLM config ==='
-        cat > ./${OUTPUT_NAME}/mlc-chat-config.json << EOF
-{
-  \"model_type\": \"qwen2\",
-  \"quantization\": \"${QUANTIZATION}\",
-  \"conv_template\": \"qwen2\",
-  \"model_config\": {
-    \"hidden_size\": 896,
-    \"intermediate_size\": 4864,
-    \"num_attention_heads\": 14,
-    \"num_hidden_layers\": 24,
-    \"num_key_value_heads\": 2,
-    \"vocab_size\": 151936,
-    \"context_window_size\": ${CONTEXT_WINDOW},
-    \"prefill_chunk_size\": 1024
-  },
-  \"vocab_size\": 151936,
-  \"context_window_size\": ${CONTEXT_WINDOW},
-  \"sliding_window_size\": -1,
-  \"prefill_chunk_size\": 1024,
-  \"attention_sink_size\": -1,
-  \"tensor_parallel_shards\": 1,
-  \"tokenizer_files\": [
-    \"tokenizer.json\",
-    \"tokenizer_config.json\"
-  ],
-  \"generation_config\": {
-    \"temperature\": 0.7,
-    \"top_p\": 0.9
-  }
+        echo '=== Patching mlc-chat-config.json for web-llm ==='
+        # gen_config outputs conv_template as a string (\"qwen2\") which works for
+        # native MLC-LLM but NOT for web-llm (which needs the full object).
+        # Patch it in-place with the full ConvTemplateConfig object.
+        python3 -c \"
+import json
+config_path = './${OUTPUT_NAME}/mlc-chat-config.json'
+with open(config_path) as f:
+    config = json.load(f)
+
+# Expand conv_template string to full ConvTemplateConfig object for web-llm
+config['conv_template'] = {
+    'name': 'qwen2',
+    'system_template': '<|im_start|>system\n{system_message}<|im_end|>\n',
+    'system_message': 'You are a helpful assistant.',
+    'system_prefix_token_ids': None,
+    'add_role_after_system_message': True,
+    'roles': {
+        'user': '<|im_start|>user',
+        'assistant': '<|im_start|>assistant'
+    },
+    'role_templates': {
+        'user': '{user_message}',
+        'assistant': '{assistant_message}',
+        'tool': '{tool_message}'
+    },
+    'messages': [],
+    'seps': ['<|im_end|>\n'],
+    'role_content_sep': '\n',
+    'role_empty_sep': '\n',
+    'stop_str': ['<|endoftext|>', '<|im_end|>'],
+    'stop_token_ids': [151643, 151645],
+    'function_string': '',
+    'use_function_calling': False
 }
-EOF
+
+# Add tokenizer info if missing
+if 'tokenizer_info' not in config:
+    config['tokenizer_info'] = {
+        'token_postproc_method': 'byte_level',
+        'prepend_space_in_encode': False,
+        'strip_space_in_decode': False
+    }
+
+# Set inference defaults
+config['temperature'] = 0.1
+config['top_p'] = 0.9
+
+# Ensure token IDs are set
+config.setdefault('pad_token_id', 151643)
+config.setdefault('bos_token_id', 151643)
+config.setdefault('eos_token_id', [151645, 151643])
+
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+
+print('Config patched successfully')
+\"
 
         echo ''
         echo '=== Renaming cache file for web-llm compatibility ==='

@@ -2,9 +2,11 @@
 # Complete pipeline: Generate data → Train → Compile for WebGPU
 #
 # Prerequisites:
-#   pip install mlx mlx-lm
+#   Python 3.10+ (brew install python)
 #   npm install
-#   Docker Desktop running
+#   Docker Desktop running (for WebGPU compile step)
+#
+# A Python venv is created automatically at training/.venv
 #
 # Usage:
 #   ./scripts/train-and-compile.sh           # Full pipeline
@@ -46,13 +48,25 @@ echo ""
 echo -e "${BLUE}Checking prerequisites...${NC}"
 
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}Error: python3 is required${NC}"
+    echo -e "${RED}Error: python3 is required (brew install python)${NC}"
     exit 1
 fi
 
+# Set up Python venv for MLX training
+VENV_DIR="${TRAINING_DIR}/.venv"
+if [ ! -d "${VENV_DIR}" ]; then
+    echo -e "${YELLOW}Creating Python venv at ${VENV_DIR}...${NC}"
+    python3 -m venv "${VENV_DIR}"
+fi
+
+# Activate venv for the rest of this script
+source "${VENV_DIR}/bin/activate"
+echo -e "${BLUE}Using Python: $(which python3)${NC}"
+
 if ! python3 -c "import mlx" 2>/dev/null; then
-    echo -e "${YELLOW}Installing MLX...${NC}"
-    pip3 install mlx mlx-lm
+    echo -e "${YELLOW}Installing MLX into venv...${NC}"
+    pip install --upgrade pip
+    pip install mlx mlx-lm
 fi
 
 if [ ! -d "${PROJECT_DIR}/node_modules" ]; then
@@ -70,19 +84,19 @@ echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━�
 
 cd "${TRAINING_DIR}"
 
-if [ -f "generated-training-data.jsonl" ]; then
-    EXISTING_COUNT=$(wc -l < generated-training-data.jsonl | tr -d ' ')
+if [ -f "mcp-training-data.jsonl" ]; then
+    EXISTING_COUNT=$(wc -l < mcp-training-data.jsonl | tr -d ' ')
     echo -e "${BLUE}Found existing training data: ${EXISTING_COUNT} examples${NC}"
     read -p "Regenerate? [y/N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        npx tsx generate-training-data.ts
+        npx tsx generate-mcp-training-data.ts --count 100000
     fi
 else
-    npx tsx generate-training-data.ts
+    npx tsx generate-mcp-training-data.ts --count 100000
 fi
 
-TRAIN_COUNT=$(wc -l < generated-training-data.jsonl | tr -d ' ')
+TRAIN_COUNT=$(wc -l < mcp-training-data.jsonl | tr -d ' ')
 echo -e "${GREEN}Training data ready: ${TRAIN_COUNT} examples${NC}"
 echo ""
 
@@ -107,7 +121,7 @@ if [ "$SKIP_TRAIN" = false ]; then
         echo ""
 
         python3 finetune_mlx.py \
-            --dataset generated-training-data.jsonl \
+            --dataset mcp-training-data.jsonl \
             --output-dir cesium-qwen-lora-mlx \
             --num-epochs 3 \
             --batch-size 4

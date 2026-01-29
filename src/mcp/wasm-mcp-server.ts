@@ -898,6 +898,90 @@ export class WasmMCPServer {
       } as CesiumCommand;
     }
 
+    // Routing & POI commands (from external APIs)
+    if (type === 'route') {
+      // Route from OpenRouteService - contains GeoJSON with the path
+      return {
+        type: 'route.show',
+        startLon: wasmOutput.startLon as number,
+        startLat: wasmOutput.startLat as number,
+        endLon: wasmOutput.endLon as number,
+        endLat: wasmOutput.endLat as number,
+        mode: wasmOutput.mode as string,
+        geojson: wasmOutput.geojson as string,
+      } as CesiumCommand;
+    }
+
+    if (type === 'poi') {
+      // POI search results from Overpass API
+      return {
+        type: 'poi.show',
+        category: wasmOutput.category as string,
+        centerLon: wasmOutput.centerLon as number,
+        centerLat: wasmOutput.centerLat as number,
+        radius: wasmOutput.radius as number,
+        overpassJson: wasmOutput.overpassJson as string,
+      } as CesiumCommand;
+    }
+
+    if (type === 'isochrone') {
+      // Isochrone polygon from OpenRouteService
+      return {
+        type: 'isochrone.show',
+        centerLon: wasmOutput.centerLon as number,
+        centerLat: wasmOutput.centerLat as number,
+        minutes: wasmOutput.minutes as number,
+        mode: wasmOutput.mode as string,
+        geojson: wasmOutput.geojson as string,
+      } as CesiumCommand;
+    }
+
+    // Compound commands - animated routes, flights, POI visualization
+    if (type === 'animatedRoute') {
+      // Animated route with model (walkTo/driveTo)
+      return {
+        type: 'route.animated',
+        startLon: wasmOutput.startLon as number,
+        startLat: wasmOutput.startLat as number,
+        endLon: wasmOutput.endLon as number,
+        endLat: wasmOutput.endLat as number,
+        mode: wasmOutput.mode as string,
+        duration: wasmOutput.duration as number,
+        modelUrl: wasmOutput.modelUrl as string,
+        animate: wasmOutput.animate === 'true' || wasmOutput.animate === true,
+        geojson: wasmOutput.geojson as string,
+      } as CesiumCommand;
+    }
+
+    if (type === 'flightPath') {
+      // Great circle flight animation
+      return {
+        type: 'flight.animated',
+        startLon: wasmOutput.startLon as number,
+        startLat: wasmOutput.startLat as number,
+        endLon: wasmOutput.endLon as number,
+        endLat: wasmOutput.endLat as number,
+        altitude: wasmOutput.altitude as number,
+        duration: wasmOutput.duration as number,
+        modelUrl: wasmOutput.modelUrl as string,
+      } as CesiumCommand;
+    }
+
+    if (type === 'poiVisualize') {
+      // POI search with automatic visualization
+      return {
+        type: 'poi.visualize',
+        category: wasmOutput.category as string,
+        centerLon: wasmOutput.centerLon as number,
+        centerLat: wasmOutput.centerLat as number,
+        radius: wasmOutput.radius as number,
+        markerColor: wasmOutput.markerColor as string,
+        showLabels: wasmOutput.showLabels === 'true' || wasmOutput.showLabels === true,
+        flyTo: wasmOutput.flyTo === 'true' || wasmOutput.flyTo === true,
+        overpassJson: wasmOutput.overpassJson as string,
+      } as CesiumCommand;
+    }
+
     // Default: pass through as-is (may fail if executor doesn't support it)
     console.warn(`[WasmMCPServer] Unknown command type: ${type}, passing through`);
     return wasmOutput as unknown as CesiumCommand;

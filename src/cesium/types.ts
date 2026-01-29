@@ -262,6 +262,78 @@ export interface LoadGeoJSONCommand {
   strokeWidth?: number;
 }
 
+// Routing & POI Commands (external API results)
+export interface ShowRouteCommand {
+  type: 'route.show';
+  startLon: number;
+  startLat: number;
+  endLon: number;
+  endLat: number;
+  mode: string;  // 'walking', 'cycling', 'driving'
+  geojson: string;  // GeoJSON from OpenRouteService
+  animate?: boolean;  // Add animated model along route
+  modelUrl?: string;  // URL for animated model
+}
+
+export interface ShowPOICommand {
+  type: 'poi.show';
+  category: string;
+  centerLon: number;
+  centerLat: number;
+  radius: number;
+  overpassJson: string;  // JSON from Overpass API
+  flyTo?: boolean;  // Fly camera to show results
+  markerColor?: string;
+}
+
+export interface ShowIsochroneCommand {
+  type: 'isochrone.show';
+  centerLon: number;
+  centerLat: number;
+  minutes: number;
+  mode: string;
+  geojson: string;  // GeoJSON polygon from OpenRouteService
+  fillColor?: string;
+  outlineColor?: string;
+}
+
+// Compound Commands (combine routing/POI with animation)
+export interface AnimatedRouteCommand {
+  type: 'route.animated';
+  startLon: number;
+  startLat: number;
+  endLon: number;
+  endLat: number;
+  mode: string;  // 'walking' or 'driving'
+  duration: number;  // Animation duration in seconds
+  modelUrl?: string;  // URL to glTF model
+  animate: boolean;
+  geojson: string;  // Route GeoJSON from OpenRouteService
+}
+
+export interface AnimatedFlightCommand {
+  type: 'flight.animated';
+  startLon: number;
+  startLat: number;
+  endLon: number;
+  endLat: number;
+  altitude: number;  // Flight altitude in meters
+  duration: number;  // Animation duration in seconds
+  modelUrl?: string;  // URL to aircraft glTF model
+}
+
+export interface VisualizePOICommand {
+  type: 'poi.visualize';
+  category: string;
+  centerLon: number;
+  centerLat: number;
+  radius: number;
+  markerColor?: string;
+  showLabels: boolean;
+  flyTo: boolean;
+  overpassJson: string;
+}
+
 export interface LoadKMLCommand {
   type: 'data.loadKML';
   url: string;
@@ -591,7 +663,13 @@ export type CesiumCommand =
   | SetImageMaterialCommand
   | SetGridMaterialCommand
   | SetStripeMaterialCommand
-  | SetCheckerboardMaterialCommand;
+  | SetCheckerboardMaterialCommand
+  | ShowRouteCommand
+  | ShowPOICommand
+  | ShowIsochroneCommand
+  | AnimatedRouteCommand
+  | AnimatedFlightCommand
+  | VisualizePOICommand;
 
 // CZML Types
 export interface CZMLPacket {

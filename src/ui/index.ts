@@ -16,3 +16,6 @@ export type { VoiceInputConfig, VoiceInputEvents, VoiceInputButtonConfig } from 
 
 export { Autocomplete, LOCATIONS as AutocompleteLocations, COMMANDS as AutocompleteCommands } from './autocomplete';
 export type { AutocompleteOption, AutocompleteConfig } from './autocomplete';
+
+export { SettingsPanel, initSettingsPanel, getSettingsPanel, getApiKey } from './settings-panel';
+export type { APIKeyConfig, SettingsPanelConfig } from './settings-panel';

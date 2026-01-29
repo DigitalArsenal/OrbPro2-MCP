@@ -34,5 +34,37 @@ export default defineConfig({
       // Ignore packages directory (contains emsdk, build artifacts)
       ignored: ['**/packages/**', '**/node_modules/**'],
     },
+    proxy: {
+      // OpenRouteService API proxy
+      '/api/ors': {
+        target: 'https://api.openrouteservice.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ors/, ''),
+        secure: true,
+      },
+      // Overpass API proxy (OpenStreetMap POI search)
+      '/api/overpass': {
+        target: 'https://overpass-api.de',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/overpass/, ''),
+        secure: true,
+      },
+      // Nominatim geocoding proxy
+      '/api/nominatim': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/nominatim/, ''),
+        secure: true,
+        headers: {
+          'User-Agent': 'OrbPro2-MCP/1.0 (https://github.com/example/orbpro2-mcp)',
+        },
+      },
+      // OSRM local routing proxy (self-hosted, port 5050 to avoid macOS AirPlay)
+      '/api/osrm': {
+        target: 'http://localhost:5050',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/osrm/, ''),
+      },
+    },
   },
 });

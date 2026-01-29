@@ -9,6 +9,7 @@ import { API_PROVIDERS, APIProvider, checkOllamaAvailable, getOllamaModels } fro
 export interface ModelSelectorConfig {
   containerId: string;
   onSelect: (selection: ModelSelection) => void;
+  onReset?: () => void;
   defaultModel?: string;
 }
 
@@ -26,9 +27,10 @@ type BrowserCategory = 'recommended' | 'small' | 'medium' | 'large';
 export class ModelSelector {
   private container: HTMLElement;
   private onSelect: (selection: ModelSelection) => void;
+  private onReset?: () => void;
 
   // Selection state - cascading
-  private selectedSource: ModelSource = null;
+  private selectedSource: ModelSource = 'browser';
   private selectedProvider: APIProvider | null = null;
   private selectedBrowserCategory: BrowserCategory | null = null;
   private selectedModel: string | null = null;
@@ -52,6 +54,7 @@ export class ModelSelector {
 
     this.container = container;
     this.onSelect = config.onSelect;
+    this.onReset = config.onReset;
 
     this.loadSavedSettings();
     this.injectStyles();
@@ -120,6 +123,14 @@ export class ModelSelector {
       ? this.getModelDisplayName(this.selectedModel)
       : (this.selectedProvider ? API_PROVIDERS[this.selectedProvider].name : 'Not configured');
 
+    const resetButton = this.selectedModel ? `
+      <button class="model-reset-btn" id="model-reset-btn" title="Change model">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
+    ` : '';
+
     const html = `
       <div class="model-selector">
         <div class="model-selector-header" id="accordion-toggle">
@@ -127,7 +138,10 @@ export class ModelSelector {
             <span class="accordion-chevron">${chevronIcon}</span>
             <h3 class="model-selector-title">Configure Model</h3>
           </div>
-          <span class="model-selector-status">${statusText}</span>
+          <div class="model-selector-header-right">
+            <span class="model-selector-status">${statusText}</span>
+            ${resetButton}
+          </div>
         </div>
 
         <div class="model-selector-content ${this.isExpanded ? 'expanded' : 'collapsed'}">
@@ -336,6 +350,9 @@ export class ModelSelector {
       'llama-3-3-70b-instruct': 'Llama 3.3 (~544 tok/s)',
       'llama-3-1-405b-instruct': 'Llama 405B',
       'qwen-2-5-72b-instruct': 'Qwen 72B',
+      // WebLLM - Custom trained
+      'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC': '⭐ Custom trained for Cesium (~600MB)',
+      'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC': '⭐ Custom trained for Cesium (~851MB)',
       // WebLLM
       'Llama-3.2-3B-Instruct-q4f16_1-MLC': 'Best for tool use (~2GB)',
       'Hermes-3-Llama-3.2-3B-q4f16_1-MLC': 'Function calling (~2GB)',
@@ -356,9 +373,22 @@ export class ModelSelector {
     // Accordion toggle
     const accordionToggle = this.container.querySelector('#accordion-toggle');
     if (accordionToggle) {
-      accordionToggle.addEventListener('click', () => {
+      accordionToggle.addEventListener('click', (e) => {
+        // Don't toggle if clicking the reset button
+        if ((e.target as HTMLElement).closest('#model-reset-btn')) {
+          return;
+        }
         this.isExpanded = !this.isExpanded;
         this.render();
+      });
+    }
+
+    // Reset button
+    const resetBtn = this.container.querySelector('#model-reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.reset();
       });
     }
 
@@ -476,6 +506,33 @@ export class ModelSelector {
     this.render();
   }
 
+  /**
+   * Reset the model selection and unload the current model
+   */
+  reset(): void {
+    // Clear selection state
+    this.selectedSource = null;
+    this.selectedProvider = null;
+    this.selectedBrowserCategory = null;
+    this.selectedModel = null;
+
+    // Clear saved settings
+    try {
+      localStorage.removeItem('cesium-slm-model-settings');
+    } catch {
+      // Ignore errors
+    }
+
+    // Expand accordion to allow new selection
+    this.isExpanded = true;
+
+    // Call reset callback to unload the model
+    this.onReset?.();
+
+    // Re-render
+    this.render();
+  }
+
   private injectStyles(): void {
     if (document.getElementById('model-selector-styles')) {
       return;
@@ -530,6 +587,12 @@ export class ModelSelector {
         font-weight: 600;
       }
 
+      .model-selector-header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
       .model-selector-status {
         font-size: 0.8em;
         color: #9ca3af;
@@ -537,6 +600,24 @@ export class ModelSelector {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      .model-reset-btn {
+        background: rgba(248, 113, 113, 0.15);
+        border: none;
+        border-radius: 6px;
+        padding: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f87171;
+        transition: background 0.2s, color 0.2s;
+      }
+
+      .model-reset-btn:hover {
+        background: rgba(248, 113, 113, 0.3);
+        color: #fca5a5;
       }
 
       .model-selector-content {

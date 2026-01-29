@@ -120,15 +120,37 @@ interface CesiumImageryLayerCollection {
 
 // Global Cesium reference (will be set by the browser environment)
 declare const Cesium: {
+  Cartesian2: new (x: number, y: number) => unknown;
   Cartesian3: {
     new (x: number, y: number, z: number): unknown;
     fromDegrees: (lon: number, lat: number, height?: number) => unknown;
+    fromDegreesArray: (coords: number[]) => unknown;
+    fromDegreesArrayHeights: (coords: number[]) => unknown;
     clone: (cartesian: unknown) => unknown;
   };
   Quaternion: new (x: number, y: number, z: number, w: number) => unknown;
   Color: {
     new (r: number, g: number, b: number, a: number): unknown;
+    fromCssColorString: (color: string) => { withAlpha: (alpha: number) => unknown };
     WHITE: unknown;
+    BLACK: unknown;
+    RED: unknown;
+    GREEN: unknown;
+    BLUE: { withAlpha: (alpha: number) => unknown };
+    ORANGE: unknown;
+    CYAN: unknown;
+    YELLOW: unknown;
+    LIME: { withAlpha: (alpha: number) => unknown };
+  };
+  VerticalOrigin: {
+    BOTTOM: unknown;
+    CENTER: unknown;
+    TOP: unknown;
+  };
+  LabelStyle: {
+    FILL: unknown;
+    OUTLINE: unknown;
+    FILL_AND_OUTLINE: unknown;
   };
   Cartographic: {
     fromDegrees: (lon: number, lat: number, height?: number) => unknown;
@@ -340,6 +362,18 @@ export class CesiumCommandExecutor {
           return this.executeSetStripeMaterial(command);
         case 'material.checkerboard':
           return this.executeSetCheckerboardMaterial(command);
+        case 'route.show':
+          return await this.executeShowRoute(command);
+        case 'poi.show':
+          return await this.executeShowPOI(command);
+        case 'isochrone.show':
+          return await this.executeShowIsochrone(command);
+        case 'route.animated':
+          return await this.executeAnimatedRoute(command);
+        case 'flight.animated':
+          return await this.executeAnimatedFlight(command);
+        case 'poi.visualize':
+          return await this.executeVisualizePOI(command);
         default:
           return { success: false, message: `Unknown command type: ${(command as CesiumCommand).type}` };
       }
@@ -2509,5 +2543,568 @@ export class CesiumCommandExecutor {
     this.loadedTilesets.clear();
 
     return { success: true, message: 'All entities and tilesets cleared' };
+  }
+
+  // ============================================================================
+  // ROUTING & POI COMMANDS (External API Results)
+  // ============================================================================
+
+  private async executeShowRoute(command: Extract<CesiumCommand, { type: 'route.show' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      // Parse the GeoJSON from OpenRouteService
+      const geojson = JSON.parse(command.geojson);
+
+      // Extract coordinates from the GeoJSON LineString
+      const coordinates: [number, number, number][] = [];
+      if (geojson.features && geojson.features[0]?.geometry?.coordinates) {
+        for (const coord of geojson.features[0].geometry.coordinates) {
+          coordinates.push([coord[0], coord[1], 0]); // lon, lat, height
+        }
+      }
+
+      if (coordinates.length < 2) {
+        return { success: false, message: 'No route coordinates found in response' };
+      }
+
+      // Create a polyline entity for the route
+      const positions = coordinates.flatMap(c => [c[0], c[1], c[2]]);
+      const routeId = `route-${Date.now()}`;
+
+      const routeColor = command.mode === 'driving' ? Cesium.Color.BLUE :
+                         command.mode === 'cycling' ? Cesium.Color.GREEN :
+                         Cesium.Color.ORANGE; // walking
+
+      this.viewer.entities.add({
+        id: routeId,
+        name: `${command.mode} route`,
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights(positions),
+          width: 5,
+          material: routeColor,
+          clampToGround: true,
+        },
+      });
+
+      // Add start and end markers
+      this.viewer.entities.add({
+        id: `${routeId}-start`,
+        name: 'Start',
+        position: Cesium.Cartesian3.fromDegrees(command.startLon, command.startLat),
+        point: {
+          pixelSize: 15,
+          color: Cesium.Color.GREEN,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+        },
+        label: {
+          text: 'Start',
+          font: '14pt sans-serif',
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -20),
+        },
+      });
+
+      this.viewer.entities.add({
+        id: `${routeId}-end`,
+        name: 'End',
+        position: Cesium.Cartesian3.fromDegrees(command.endLon, command.endLat),
+        point: {
+          pixelSize: 15,
+          color: Cesium.Color.RED,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+        },
+        label: {
+          text: 'End',
+          font: '14pt sans-serif',
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -20),
+        },
+      });
+
+      // Fly to show the entire route
+      const entity = this.viewer.entities.getById(routeId);
+      if (entity) {
+        this.viewer.flyTo(entity, { duration: 2 });
+      }
+
+      return {
+        success: true,
+        message: `${command.mode} route displayed with ${coordinates.length} points`,
+        data: { routeId, pointCount: coordinates.length },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to show route: ${errorMessage}` };
+    }
+  }
+
+  private async executeShowPOI(command: Extract<CesiumCommand, { type: 'poi.show' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      // Parse the Overpass API JSON response
+      const overpassData = JSON.parse(command.overpassJson);
+
+      if (!overpassData.elements || overpassData.elements.length === 0) {
+        return { success: false, message: `No ${command.category} found in the area` };
+      }
+
+      const markerColor = command.markerColor ?
+        Cesium.Color.fromCssColorString(command.markerColor) :
+        Cesium.Color.CYAN;
+
+      const poiGroupId = `poi-${command.category}-${Date.now()}`;
+      let count = 0;
+
+      for (const element of overpassData.elements) {
+        // Get coordinates (nodes have lat/lon directly, ways/relations have center)
+        let lat: number, lon: number;
+        if (element.lat !== undefined && element.lon !== undefined) {
+          lat = element.lat;
+          lon = element.lon;
+        } else if (element.center) {
+          lat = element.center.lat;
+          lon = element.center.lon;
+        } else {
+          continue; // Skip elements without coordinates
+        }
+
+        const name = element.tags?.name || `${command.category} ${count + 1}`;
+        const poiId = `${poiGroupId}-${count}`;
+
+        this.viewer.entities.add({
+          id: poiId,
+          name: name,
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: {
+            pixelSize: 12,
+            color: markerColor,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+          label: {
+            text: name,
+            font: '12pt sans-serif',
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -15),
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          },
+        });
+
+        count++;
+      }
+
+      // Optionally fly to show results
+      if (command.flyTo !== false) {
+        this.viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            command.centerLon,
+            command.centerLat,
+            command.radius * 3 // Fly to height based on search radius
+          ),
+          duration: 2,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Found ${count} ${command.category} locations`,
+        data: { poiGroupId, count },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to show POI: ${errorMessage}` };
+    }
+  }
+
+  private async executeShowIsochrone(command: Extract<CesiumCommand, { type: 'isochrone.show' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      // Parse the GeoJSON from OpenRouteService
+      const geojson = JSON.parse(command.geojson);
+
+      if (!geojson.features || geojson.features.length === 0) {
+        return { success: false, message: 'No isochrone polygon in response' };
+      }
+
+      const fillColor = command.fillColor ?
+        Cesium.Color.fromCssColorString(command.fillColor).withAlpha(0.3) :
+        Cesium.Color.BLUE.withAlpha(0.3);
+
+      const outlineColor = command.outlineColor ?
+        Cesium.Color.fromCssColorString(command.outlineColor) :
+        Cesium.Color.BLUE;
+
+      const isochroneId = `isochrone-${Date.now()}`;
+
+      for (let i = 0; i < geojson.features.length; i++) {
+        const feature = geojson.features[i];
+        if (feature.geometry?.type === 'Polygon') {
+          const coords = feature.geometry.coordinates[0]; // Outer ring
+          const positions = coords.flatMap((c: number[]) => [c[0], c[1]]);
+
+          this.viewer.entities.add({
+            id: `${isochroneId}-${i}`,
+            name: `${command.minutes} min ${command.mode} area`,
+            polygon: {
+              hierarchy: Cesium.Cartesian3.fromDegreesArray(positions),
+              material: fillColor,
+              outline: true,
+              outlineColor: outlineColor,
+              outlineWidth: 2,
+            },
+          });
+        }
+      }
+
+      // Add center marker
+      this.viewer.entities.add({
+        id: `${isochroneId}-center`,
+        name: 'Center',
+        position: Cesium.Cartesian3.fromDegrees(command.centerLon, command.centerLat),
+        point: {
+          pixelSize: 15,
+          color: Cesium.Color.RED,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+        },
+        label: {
+          text: `${command.minutes} min ${command.mode}`,
+          font: '14pt sans-serif',
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -20),
+        },
+      });
+
+      // Fly to show the isochrone
+      const entity = this.viewer.entities.getById(`${isochroneId}-0`);
+      if (entity) {
+        this.viewer.flyTo(entity, { duration: 2 });
+      }
+
+      return {
+        success: true,
+        message: `${command.minutes} minute ${command.mode} isochrone displayed`,
+        data: { isochroneId },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to show isochrone: ${errorMessage}` };
+    }
+  }
+
+  // ============================================================================
+  // COMPOUND COMMANDS (Animated Routes, Flights, POI Visualization)
+  // ============================================================================
+
+  private async executeAnimatedRoute(command: Extract<CesiumCommand, { type: 'route.animated' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      // Parse GeoJSON route
+      const geojson = JSON.parse(command.geojson);
+      const coordinates: [number, number][] = [];
+
+      if (geojson.features?.[0]?.geometry?.coordinates) {
+        for (const coord of geojson.features[0].geometry.coordinates) {
+          coordinates.push([coord[0], coord[1]]);
+        }
+      }
+
+      if (coordinates.length < 2) {
+        return { success: false, message: 'No route coordinates found' };
+      }
+
+      const routeId = `animated-route-${Date.now()}`;
+      const routeColor = command.mode === 'driving' ? Cesium.Color.BLUE : Cesium.Color.ORANGE;
+
+      // Draw the route polyline
+      const positions = coordinates.flatMap(c => [c[0], c[1], 0]);
+      this.viewer.entities.add({
+        id: `${routeId}-line`,
+        name: `${command.mode} route`,
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights(positions),
+          width: 4,
+          material: routeColor,
+          clampToGround: true,
+        },
+      });
+
+      // Create time-based animation using CZML
+      const startTime = Cesium.JulianDate.now();
+      const stopTime = Cesium.JulianDate.addSeconds(startTime, command.duration, new Cesium.JulianDate());
+
+      // Build position samples for interpolation
+      const cartographicDegrees: number[] = [];
+      const totalDistance = coordinates.length - 1;
+      for (let i = 0; i < coordinates.length; i++) {
+        const time = (i / totalDistance) * command.duration;
+        cartographicDegrees.push(time, coordinates[i][0], coordinates[i][1], 1.5); // 1.5m height for walking
+      }
+
+      // Add animated entity with model or point
+      const entityOptions: Record<string, unknown> = {
+        id: routeId,
+        name: command.mode === 'driving' ? 'Vehicle' : 'Person',
+        availability: `${Cesium.JulianDate.toIso8601(startTime)}/${Cesium.JulianDate.toIso8601(stopTime)}`,
+        position: {
+          epoch: Cesium.JulianDate.toIso8601(startTime),
+          cartographicDegrees,
+          interpolationAlgorithm: 'LAGRANGE',
+          interpolationDegree: 1,
+        },
+        orientation: {
+          velocityReference: '#position',
+        },
+        point: command.modelUrl ? undefined : {
+          pixelSize: 15,
+          color: command.mode === 'driving' ? Cesium.Color.BLUE : Cesium.Color.ORANGE,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2,
+        },
+        path: {
+          leadTime: 0,
+          trailTime: command.duration,
+          width: 2,
+          material: routeColor.withAlpha(0.5),
+        },
+      };
+
+      // Add model if URL provided
+      if (command.modelUrl) {
+        entityOptions.model = {
+          uri: command.modelUrl,
+          scale: 1.0,
+          minimumPixelSize: 32,
+        };
+      }
+
+      // Load as CZML for time-based animation
+      const czml = [
+        { id: 'document', version: '1.0', clock: {
+          interval: `${Cesium.JulianDate.toIso8601(startTime)}/${Cesium.JulianDate.toIso8601(stopTime)}`,
+          currentTime: Cesium.JulianDate.toIso8601(startTime),
+          multiplier: 1,
+        }},
+        entityOptions,
+      ];
+
+      const dataSource = await Cesium.CzmlDataSource.load(czml);
+      await this.viewer.dataSources.add(dataSource);
+
+      // Set clock and start animation
+      this.viewer.clock.startTime = startTime;
+      this.viewer.clock.stopTime = stopTime;
+      this.viewer.clock.currentTime = startTime;
+      this.viewer.clock.shouldAnimate = true;
+
+      // Track the animated entity
+      const entity = dataSource.entities.getById(routeId);
+      if (entity) {
+        this.viewer.trackedEntity = entity;
+      }
+
+      return {
+        success: true,
+        message: `${command.mode} animation started (${command.duration}s duration, ${coordinates.length} waypoints)`,
+        data: { routeId },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to create animated route: ${errorMessage}` };
+    }
+  }
+
+  private async executeAnimatedFlight(command: Extract<CesiumCommand, { type: 'flight.animated' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      const flightId = `flight-${Date.now()}`;
+
+      // Generate great circle path between start and end
+      const numPoints = 100;
+      const positions: number[] = [];
+
+      for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        // Simple linear interpolation (for short distances; great circle would be better for long)
+        const lon = command.startLon + (command.endLon - command.startLon) * t;
+        const lat = command.startLat + (command.endLat - command.startLat) * t;
+        // Arc altitude - peak in middle
+        const altFactor = Math.sin(t * Math.PI);
+        const alt = command.altitude * (0.3 + 0.7 * altFactor); // Min 30% altitude at endpoints
+
+        const time = t * command.duration;
+        positions.push(time, lon, lat, alt);
+      }
+
+      // Create CZML for flight animation
+      const startTime = Cesium.JulianDate.now();
+      const stopTime = Cesium.JulianDate.addSeconds(startTime, command.duration, new Cesium.JulianDate());
+
+      const entityOptions: Record<string, unknown> = {
+        id: flightId,
+        name: 'Aircraft',
+        availability: `${Cesium.JulianDate.toIso8601(startTime)}/${Cesium.JulianDate.toIso8601(stopTime)}`,
+        position: {
+          epoch: Cesium.JulianDate.toIso8601(startTime),
+          cartographicDegrees: positions,
+          interpolationAlgorithm: 'LAGRANGE',
+          interpolationDegree: 2,
+        },
+        orientation: {
+          velocityReference: '#position',
+        },
+        point: command.modelUrl ? undefined : {
+          pixelSize: 20,
+          color: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.RED,
+          outlineWidth: 3,
+        },
+        path: {
+          leadTime: command.duration,
+          trailTime: command.duration,
+          width: 2,
+          material: { solidColor: { color: { rgba: [255, 255, 255, 100] } } },
+        },
+      };
+
+      if (command.modelUrl) {
+        entityOptions.model = {
+          uri: command.modelUrl,
+          scale: 1.0,
+          minimumPixelSize: 64,
+        };
+      }
+
+      const czml = [
+        { id: 'document', version: '1.0', clock: {
+          interval: `${Cesium.JulianDate.toIso8601(startTime)}/${Cesium.JulianDate.toIso8601(stopTime)}`,
+          currentTime: Cesium.JulianDate.toIso8601(startTime),
+          multiplier: 1,
+        }},
+        entityOptions,
+      ];
+
+      // Add start/end markers
+      this.viewer.entities.add({
+        id: `${flightId}-start`,
+        name: 'Departure',
+        position: Cesium.Cartesian3.fromDegrees(command.startLon, command.startLat),
+        point: { pixelSize: 12, color: Cesium.Color.GREEN, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+      });
+
+      this.viewer.entities.add({
+        id: `${flightId}-end`,
+        name: 'Arrival',
+        position: Cesium.Cartesian3.fromDegrees(command.endLon, command.endLat),
+        point: { pixelSize: 12, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+      });
+
+      const dataSource = await Cesium.CzmlDataSource.load(czml);
+      await this.viewer.dataSources.add(dataSource);
+
+      // Set clock and start
+      this.viewer.clock.startTime = startTime;
+      this.viewer.clock.stopTime = stopTime;
+      this.viewer.clock.currentTime = startTime;
+      this.viewer.clock.shouldAnimate = true;
+
+      // Track the aircraft
+      const entity = dataSource.entities.getById(flightId);
+      if (entity) {
+        this.viewer.trackedEntity = entity;
+      }
+
+      return {
+        success: true,
+        message: `Flight animation started from (${command.startLon.toFixed(2)}, ${command.startLat.toFixed(2)}) to (${command.endLon.toFixed(2)}, ${command.endLat.toFixed(2)})`,
+        data: { flightId },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to create flight animation: ${errorMessage}` };
+    }
+  }
+
+  private async executeVisualizePOI(command: Extract<CesiumCommand, { type: 'poi.visualize' }>): Promise<{ success: boolean; message: string; data?: unknown }> {
+    try {
+      const overpassData = JSON.parse(command.overpassJson);
+
+      if (!overpassData.elements || overpassData.elements.length === 0) {
+        return { success: false, message: `No ${command.category} found in the area` };
+      }
+
+      const markerColor = command.markerColor ?
+        Cesium.Color.fromCssColorString(command.markerColor) :
+        Cesium.Color.CYAN;
+
+      const poiGroupId = `poi-viz-${command.category}-${Date.now()}`;
+      let count = 0;
+
+      for (const element of overpassData.elements) {
+        let lat: number, lon: number;
+        if (element.lat !== undefined && element.lon !== undefined) {
+          lat = element.lat;
+          lon = element.lon;
+        } else if (element.center) {
+          lat = element.center.lat;
+          lon = element.center.lon;
+        } else {
+          continue;
+        }
+
+        const name = element.tags?.name || `${command.category} ${count + 1}`;
+        const poiId = `${poiGroupId}-${count}`;
+
+        const entityOptions: Record<string, unknown> = {
+          id: poiId,
+          name: name,
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: {
+            pixelSize: 14,
+            color: markerColor,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+          },
+        };
+
+        if (command.showLabels) {
+          entityOptions.label = {
+            text: name,
+            font: '12pt sans-serif',
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -18),
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          };
+        }
+
+        this.viewer.entities.add(entityOptions as Parameters<typeof this.viewer.entities.add>[0]);
+        count++;
+      }
+
+      // Fly to show results
+      if (command.flyTo) {
+        this.viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            command.centerLon,
+            command.centerLat,
+            Math.max(command.radius * 3, 1000)
+          ),
+          duration: 2,
+        });
+      }
+
+      return {
+        success: true,
+        message: `Found and displayed ${count} ${command.category} locations`,
+        data: { poiGroupId, count },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { success: false, message: `Failed to visualize POI: ${errorMessage}` };
+    }
   }
 }

@@ -1,0 +1,145 @@
+# OrbPro2 Local Geospatial Services
+# Run with: docker-compose up -d
+#
+# Prerequisites:
+#   1. Download OSM data: ./scripts/download-osm.sh <region>
+#   2. Process OSRM data: ./scripts/process-osrm.sh <region>
+#   3. Start services: docker-compose up -d
+#
+# Default region: new-york (Manhattan area for testing)
+
+services:
+  # ==========================================================================
+  # OSRM - Open Source Routing Machine
+  # Provides walking, driving, cycling routes
+  # API: http://localhost:5000/route/v1/{profile}/{coords}
+  # Docs: https://project-osrm.org/docs/v5.27.1/api/
+  # ==========================================================================
+  osrm-car:
+    image: osrm/osrm-backend:latest
+    container_name: orbpro-osrm-car
+    restart: unless-stopped
+    ports:
+      - "5050:5000"
+    volumes:
+      - ./data/osrm:/data
+    command: osrm-routed --algorithm mld /data/region-latest.osrm
+
+  osrm-foot:
+    image: osrm/osrm-backend:latest
+    container_name: orbpro-osrm-foot
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./data/osrm-foot:/data
+    command: osrm-routed --algorithm mld /data/region-latest.osrm
+    profiles:
+      - full
+
+  osrm-bike:
+    image: osrm/osrm-backend:latest
+    container_name: orbpro-osrm-bike
+    restart: unless-stopped
+    ports:
+      - "5002:5000"
+    volumes:
+      - ./data/osrm-bike:/data
+    command: osrm-routed --algorithm mld /data/region-latest.osrm
+    profiles:
+      - full
+
+  # ==========================================================================
+  # Nominatim - Geocoding Service
+  # Forward geocoding: address -> coordinates
+  # Reverse geocoding: coordinates -> address
+  # API: http://localhost:8080/search?q=<query>
+  # Docs: https://nominatim.org/release-docs/latest/api/Overview/
+  # ==========================================================================
+  nominatim:
+    image: mediagis/nominatim:4.4
+    container_name: orbpro-nominatim
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PBF_PATH: /nominatim/data/region-latest.osm.pbf
+      REPLICATION_URL: ""
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_US_POSTCODES: "false"
+      IMPORT_GB_POSTCODES: "false"
+      NOMINATIM_PASSWORD: nominatim
+    volumes:
+      - ./data/nominatim:/var/lib/postgresql/14/main
+      - ./data/osm:/nominatim/data
+    shm_size: 1g
+    profiles:
+      - geocoding
+
+  # ==========================================================================
+  # Overpass API - OSM Data Queries
+  # Query OpenStreetMap features (POIs, buildings, roads, etc.)
+  # API: http://localhost:12345/api/interpreter
+  # Query language: https://wiki.openstreetmap.org/wiki/Overpass_API/Language_Guide
+  # ==========================================================================
+  overpass:
+    image: wiktorn/overpass-api:latest
+    container_name: orbpro-overpass
+    restart: unless-stopped
+    ports:
+      - "12345:80"
+    environment:
+      OVERPASS_META: "yes"
+      OVERPASS_MODE: init
+      OVERPASS_PLANET_URL: "file:///data/region-latest.osm.pbf"
+      OVERPASS_DIFF_URL: ""
+      OVERPASS_RULES_LOAD: "10"
+    volumes:
+      - ./data/overpass:/db
+      - ./data/osm:/data:ro
+    profiles:
+      - poi
+
+  # ==========================================================================
+  # Tile Server (Optional) - Raster Map Tiles
+  # Serves pre-rendered map tiles for 2D overlays
+  # API: http://localhost:8081/{z}/{x}/{y}.png
+  # ==========================================================================
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: orbpro-tileserver
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./data/tiles:/data
+    profiles:
+      - tiles
+
+  # ==========================================================================
+  # Martin - Vector Tile Server (Optional)
+  # Serves vector tiles from PostGIS or MBTiles
+  # API: http://localhost:3000/{source}/{z}/{x}/{y}
+  # ==========================================================================
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: orbpro-martin
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/mbtiles:/data
+    command: /data
+    profiles:
+      - tiles
+
+# Networks
+networks:
+  default:
+    name: orbpro-geo-network
+
+# Volumes for persistent data
+volumes:
+  osrm-data:
+  nominatim-data:
+  overpass-data:

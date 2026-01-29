@@ -34,11 +34,15 @@ npm-debug.log*
 .env.local
 .env.*.local
 
-# Training data (generated, can regenerate with npx tsx training/generate-training-data.ts)
+# Python venv (created by train-and-compile.sh)
+.venv/
+
+# Training data (generated, can regenerate with npx tsx training/generate-mcp-training-data.ts)
 training/*.jsonl
 training/*.yaml
 training/*.bin
 training/*.safetensors
+training/.venv/
 training/finetune/output/
 training/cesium-qwen-*/
 

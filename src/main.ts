@@ -7,7 +7,8 @@
 const originalFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  console.log(`[FETCH] >>> ${url}`);
+  const isOllama = url.includes('localhost:11434');
+  if (!isOllama) console.log(`[FETCH] >>> ${url}`);
   try {
     const response = await originalFetch(input, init);
     const contentType = response.headers.get('content-type') || 'unknown';
@@ -18,7 +19,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     }
     return response;
   } catch (error) {
-    console.error(`[FETCH] FAILED: ${url}`, error);
+    // Don't log expected failures (e.g. Ollama not running)
+    if (!isOllama) {
+      console.error(`[FETCH] FAILED: ${url}`, error);
+    }
     throw error;
   }
 };

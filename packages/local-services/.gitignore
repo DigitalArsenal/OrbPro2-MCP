@@ -1,0 +1,18 @@
+# OSM data files (can be several GB)
+data/osm/
+data/osrm/
+data/osrm-foot/
+data/osrm-bike/
+
+# Nominatim database
+data/nominatim/
+
+# Overpass database
+data/overpass/
+
+# Tile data
+data/tiles/
+data/mbtiles/
+
+# Keep the data directory structure
+!data/.gitkeep

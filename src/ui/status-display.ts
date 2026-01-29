@@ -25,14 +25,16 @@ export interface StatusInfo {
 export class StatusDisplay {
   private container: HTMLElement;
   private status: StatusInfo;
+  private onModelReset?: () => void;
 
-  constructor(containerId: string) {
+  constructor(containerId: string, options?: { onModelReset?: () => void }) {
     const container = document.getElementById(containerId);
     if (!container) {
       throw new Error(`Container element '${containerId}' not found`);
     }
 
     this.container = container;
+    this.onModelReset = options?.onModelReset;
     this.status = {
       webgpu: { supported: false },
       model: { loaded: false, loading: false, progress: 0 },
@@ -93,6 +95,11 @@ export class StatusDisplay {
           <span class="status-icon">✓</span>
           <span class="status-label">Model</span>
           <span class="status-detail">${model.name || 'Loaded'}</span>
+          <button class="status-reset-btn" id="status-model-reset" title="Change model">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+          </button>
         </div>
       `;
     } else if (model.error) {
@@ -125,6 +132,15 @@ export class StatusDisplay {
     html += '</div>';
 
     this.container.innerHTML = html;
+
+    // Attach reset button listener
+    const resetBtn = this.container.querySelector('#status-model-reset');
+    if (resetBtn && this.onModelReset) {
+      resetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.onModelReset?.();
+      });
+    }
   }
 
   hide(): void {
@@ -214,6 +230,25 @@ export class StatusDisplay {
         color: #9ca3af;
         margin-top: 4px;
         display: inline-block;
+      }
+
+      .status-reset-btn {
+        background: none;
+        border: 1px solid #4a4a6a;
+        border-radius: 4px;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 4px 6px;
+        display: flex;
+        align-items: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+      }
+
+      .status-reset-btn:hover {
+        color: #f87171;
+        border-color: #f87171;
+        background: rgba(248, 113, 113, 0.1);
       }
     `;
 

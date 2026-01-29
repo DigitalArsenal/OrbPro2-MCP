@@ -5,11 +5,11 @@
 # Try to find the output file
 if [ -n "$1" ]; then
     OUTPUT_FILE="$1"
-elif [ -f "/private/tmp/claude/-Users-tj-software-OrbPro-Small-Language-Model/tasks/be0c933.output" ]; then
-    OUTPUT_FILE="/private/tmp/claude/-Users-tj-software-OrbPro-Small-Language-Model/tasks/be0c933.output"
+elif [ -f "/private/tmp/claude/-Users-tj-software-OrbPro2-MCP/tasks/be0c933.output" ]; then
+    OUTPUT_FILE="/private/tmp/claude/-Users-tj-software-OrbPro2-MCP/tasks/be0c933.output"
 else
     # Find most recent training output
-    OUTPUT_FILE=$(ls -t /private/tmp/claude/-Users-tj-software-OrbPro-Small-Language-Model/tasks/*.output 2>/dev/null | head -1)
+    OUTPUT_FILE=$(ls -t /private/tmp/claude/-Users-tj-software-OrbPro2-MCP/tasks/*.output 2>/dev/null | head -1)
 fi
 
 if [ -z "$OUTPUT_FILE" ] || [ ! -f "$OUTPUT_FILE" ]; then

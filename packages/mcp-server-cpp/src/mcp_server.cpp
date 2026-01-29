@@ -6,6 +6,7 @@
 #include "json_rpc.h"
 #include "location_database.h"
 #include "cesium_commands.h"
+#include "http_client.h"
 
 #include <cstring>
 #include <cstdio>
@@ -83,7 +84,14 @@ static const char* TOOL_DEFINITIONS = R"JSON([
   {"name":"addModelHere","description":"Add a 3D model (glTF/glb) at current camera view center.","inputSchema":{"type":"object","properties":{"url":{"type":"string"},"ionAssetId":{"type":"number"},"scale":{"type":"number"},"heading":{"type":"number"},"name":{"type":"string"}}}},
   {"name":"addPolygonHere","description":"Add a polygon centered at current camera view.","inputSchema":{"type":"object","properties":{"radius":{"type":"number","description":"Radius in meters to generate polygon vertices around center"},"sides":{"type":"number","description":"Number of sides (3=triangle, 4=square, 6=hexagon, etc)"},"color":{"type":"string"},"height":{"type":"number"},"extrudedHeight":{"type":"number"},"name":{"type":"string"}}}},
   {"name":"addEntityHere","description":"Generic tool to add any entity at current camera view center. Specify entityType: sphere, box, cylinder, point, label, circle, model.","inputSchema":{"type":"object","properties":{"entityType":{"type":"string","enum":["sphere","box","cylinder","point","label","circle","model"]},"radius":{"type":"number"},"color":{"type":"string"},"height":{"type":"number"},"name":{"type":"string"},"text":{"type":"string"}},"required":["entityType"]}},
-  {"name":"addSensorConeHere","description":"Add a sensor cone/fan/radar/camera FOV at current camera view center. Use when user says 'add sensor', 'add radar', 'add FOV', etc. without specifying a location.","inputSchema":{"type":"object","properties":{"radius":{"type":"number","description":"Length/range of sensor in meters (default: 50000)"},"horizontalAngle":{"type":"number","description":"Horizontal FOV in degrees, 1-360 (default: 45)"},"verticalAngle":{"type":"number","description":"Vertical FOV in degrees, 1-180 (default: 30)"},"heading":{"type":"number","description":"Direction in degrees, 0=North, 90=East (default: 0)"},"pitch":{"type":"number","description":"Pitch angle, -90=down, 0=horizontal (default: 0)"},"height":{"type":"number","description":"Height above ground in meters (default: 0)"},"innerRadius":{"type":"number","description":"Inner radius for hollow cone (default: 0)"},"color":{"type":"string","description":"Color name (default: lime)"},"opacity":{"type":"number","description":"Opacity 0-1 (default: 0.5)"},"name":{"type":"string"}}}}
+  {"name":"addSensorConeHere","description":"Add a sensor cone/fan/radar/camera FOV at current camera view center. Use when user says 'add sensor', 'add radar', 'add FOV', etc. without specifying a location.","inputSchema":{"type":"object","properties":{"radius":{"type":"number","description":"Length/range of sensor in meters (default: 50000)"},"horizontalAngle":{"type":"number","description":"Horizontal FOV in degrees, 1-360 (default: 45)"},"verticalAngle":{"type":"number","description":"Vertical FOV in degrees, 1-180 (default: 30)"},"heading":{"type":"number","description":"Direction in degrees, 0=North, 90=East (default: 0)"},"pitch":{"type":"number","description":"Pitch angle, -90=down, 0=horizontal (default: 0)"},"height":{"type":"number","description":"Height above ground in meters (default: 0)"},"innerRadius":{"type":"number","description":"Inner radius for hollow cone (default: 0)"},"color":{"type":"string","description":"Color name (default: lime)"},"opacity":{"type":"number","description":"Opacity 0-1 (default: 0.5)"},"name":{"type":"string"}}}},
+  {"name":"getRoute","description":"Get walking/driving/cycling directions between two locations. Returns route as polyline coordinates. Requires ORS API key.","inputSchema":{"type":"object","properties":{"startLocation":{"type":"string","description":"Starting location name (e.g. 'Times Square')"},"endLocation":{"type":"string","description":"Ending location name (e.g. 'Grand Central')"},"startLon":{"type":"number","description":"Start longitude (use if not using startLocation)"},"startLat":{"type":"number","description":"Start latitude"},"endLon":{"type":"number","description":"End longitude (use if not using endLocation)"},"endLat":{"type":"number","description":"End latitude"},"mode":{"type":"string","enum":["walking","cycling","driving"],"description":"Transport mode (default: walking)"},"apiKey":{"type":"string","description":"OpenRouteService API key"}}}},
+  {"name":"searchPOI","description":"Search for points of interest (restaurants, hospitals, parks, etc.) near a location using OpenStreetMap data.","inputSchema":{"type":"object","properties":{"category":{"type":"string","description":"POI category: restaurant, hospital, park, airport, hotel, museum, pharmacy, school, bank, fuel, parking, cafe, bar, cinema, theatre, library, police, fire_station, post_office, supermarket, convenience, bakery, butcher"},"location":{"type":"string","description":"Center location name (e.g. 'Times Square')"},"longitude":{"type":"number","description":"Center longitude (use if not using location)"},"latitude":{"type":"number","description":"Center latitude"},"radius":{"type":"number","description":"Search radius in meters (default: 1000, max: 50000)"}},"required":["category"]}},
+  {"name":"getIsochrone","description":"Get the area reachable within a given time from a location. Returns polygon coordinates.","inputSchema":{"type":"object","properties":{"location":{"type":"string","description":"Center location name"},"longitude":{"type":"number","description":"Center longitude (use if not using location)"},"latitude":{"type":"number","description":"Center latitude"},"minutes":{"type":"number","description":"Travel time in minutes (default: 15)"},"mode":{"type":"string","enum":["walking","cycling","driving"],"description":"Transport mode (default: walking)"},"apiKey":{"type":"string","description":"OpenRouteService API key"}}}},
+  {"name":"walkTo","description":"Show an animated person walking from one location to another. Combines routing with animated model. Use for: 'show someone walking from A to B', 'animate a walk from...', 'create walking path animation'.","inputSchema":{"type":"object","properties":{"startLocation":{"type":"string","description":"Starting location name"},"endLocation":{"type":"string","description":"Ending location name"},"startLon":{"type":"number"},"startLat":{"type":"number"},"endLon":{"type":"number"},"endLat":{"type":"number"},"duration":{"type":"number","description":"Animation duration in seconds (default: 30)"},"modelUrl":{"type":"string","description":"URL to walking person glTF model (optional)"},"apiKey":{"type":"string","description":"OpenRouteService API key"}}}},
+  {"name":"driveTo","description":"Show an animated vehicle driving from one location to another. Combines routing with animated car model. Use for: 'show a car driving from A to B', 'animate driving route'.","inputSchema":{"type":"object","properties":{"startLocation":{"type":"string","description":"Starting location name"},"endLocation":{"type":"string","description":"Ending location name"},"startLon":{"type":"number"},"startLat":{"type":"number"},"endLon":{"type":"number"},"endLat":{"type":"number"},"duration":{"type":"number","description":"Animation duration in seconds (default: 30)"},"modelUrl":{"type":"string","description":"URL to vehicle glTF model (optional)"},"apiKey":{"type":"string","description":"OpenRouteService API key"}}}},
+  {"name":"flyPathTo","description":"Show an animated aircraft flying from one location to another along a great circle arc. Use for: 'show a plane flying from Paris to London', 'create flight animation'.","inputSchema":{"type":"object","properties":{"startLocation":{"type":"string","description":"Starting location name"},"endLocation":{"type":"string","description":"Ending location name"},"startLon":{"type":"number"},"startLat":{"type":"number"},"endLon":{"type":"number"},"endLat":{"type":"number"},"altitude":{"type":"number","description":"Flight altitude in meters (default: 10000)"},"duration":{"type":"number","description":"Animation duration in seconds (default: 30)"},"modelUrl":{"type":"string","description":"URL to aircraft glTF model (optional)"}}}},
+  {"name":"findAndShow","description":"Search for POIs and display them with markers, then fly camera to show results. Combines searchPOI with visualization. Use for: 'find and show all restaurants near...', 'show me hospitals around...'.","inputSchema":{"type":"object","properties":{"category":{"type":"string","description":"POI category: restaurant, hospital, park, airport, hotel, etc."},"location":{"type":"string","description":"Center location name"},"longitude":{"type":"number"},"latitude":{"type":"number"},"radius":{"type":"number","description":"Search radius in meters (default: 1000)"},"markerColor":{"type":"string","description":"Color for markers (default: cyan)"},"showLabels":{"type":"boolean","description":"Show name labels (default: true)"}},"required":["category"]}}
 ])JSON";
 
 // Resource definitions
@@ -1451,6 +1459,376 @@ size_t handle_tools_call(const char* id, const char* params, char* response, siz
                      height, radius, horizontal_angle, vertical_angle,
                      heading, pitch, inner_radius, color, opacity,
                      name[0] ? name : "sensor");
+        }
+    }
+    // ========================================================================
+    // ROUTING & POI TOOLS (use external APIs via HTTP)
+    // ========================================================================
+    else if (strcmp(tool_name, "getRoute") == 0) {
+        // Get directions between two locations
+        char start_location[256] = "";
+        char end_location[256] = "";
+        char mode[32] = "walking";
+        char api_key[128] = "";
+        double start_lon = 0, start_lat = 0, end_lon = 0, end_lat = 0;
+
+        json_get_string(args_json, "startLocation", start_location, sizeof(start_location));
+        json_get_string(args_json, "endLocation", end_location, sizeof(end_location));
+        json_get_string(args_json, "mode", mode, sizeof(mode));
+        json_get_string(args_json, "apiKey", api_key, sizeof(api_key));
+        json_get_number(args_json, "startLon", start_lon);
+        json_get_number(args_json, "startLat", start_lat);
+        json_get_number(args_json, "endLon", end_lon);
+        json_get_number(args_json, "endLat", end_lat);
+
+        // Resolve location names to coordinates
+        if (start_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(start_location, start_lon, start_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve start location: %s", start_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+        if (end_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(end_location, end_lon, end_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve end location: %s", end_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+
+        // Map mode to profile names
+        const char* ors_profile = "foot-walking";
+        if (strcmp(mode, "cycling") == 0) ors_profile = "cycling-regular";
+        else if (strcmp(mode, "driving") == 0) ors_profile = "driving-car";
+
+        char http_response[MAX_HTTP_RESPONSE_SIZE];
+        size_t len = 0;
+        const char* backend_used = "none";
+
+        // Try OSRM first if no API key provided
+        if (api_key[0] == '\0') {
+            // Try OSRM (local routing)
+            len = osrm_get_directions(start_lon, start_lat, end_lon, end_lat,
+                                      mode, http_response, sizeof(http_response));
+            if (len > 0) {
+                backend_used = "osrm";
+            }
+        }
+
+        // Fall back to ORS if we have an API key or OSRM failed
+        if (len == 0 && api_key[0] != '\0') {
+            len = ors_get_directions(api_key, start_lon, start_lat, end_lon, end_lat,
+                                     ors_profile, http_response, sizeof(http_response));
+            if (len > 0) {
+                backend_used = "ors";
+            }
+        }
+
+        if (len > 0) {
+            // Return the GeoJSON response - TypeScript side will parse and visualize
+            snprintf(result_text, sizeof(result_text),
+                     "type,startLon,startLat,endLon,endLat,mode,backend,geojson\n"
+                     "route,%.6f,%.6f,%.6f,%.6f,%s,%s,%s",
+                     start_lon, start_lat, end_lon, end_lat, mode, backend_used, http_response);
+        } else if (api_key[0] == '\0') {
+            strcpy(result_text, "No routing backend available. Either start a local OSRM server (docker run -p 5000:5000 osrm/osrm-backend) or provide an apiKey for OpenRouteService.");
+        } else {
+            strcpy(result_text, "Failed to get route. Check API key and try again.");
+        }
+    }
+    else if (strcmp(tool_name, "searchPOI") == 0) {
+        // Search for points of interest
+        char category[64] = "";
+        char location[256] = "";
+        double lon = 0, lat = 0;
+        double radius = 1000;
+
+        json_get_string(args_json, "category", category, sizeof(category));
+        json_get_string(args_json, "location", location, sizeof(location));
+        json_get_number(args_json, "longitude", lon);
+        json_get_number(args_json, "latitude", lat);
+        json_get_number(args_json, "radius", radius);
+
+        // Resolve location name
+        if (location[0] != '\0') {
+            double heading;
+            if (!resolve_location(location, lon, lat, heading)) {
+                // If not in our database, use current camera position
+                if (camera_state_valid) {
+                    lon = camera_target_longitude;
+                    lat = camera_target_latitude;
+                } else {
+                    snprintf(result_text, sizeof(result_text),
+                             "Could not resolve location: %s", location);
+                    char result[65536];
+                    format_tool_result(result_text, true, result, sizeof(result));
+                    return create_success_response(id, result, response, response_size);
+                }
+            }
+        } else if (lon == 0 && lat == 0 && camera_state_valid) {
+            // Use camera position if no location specified
+            lon = camera_target_longitude;
+            lat = camera_target_latitude;
+        }
+
+        if (category[0] == '\0') {
+            strcpy(result_text, "Category required. Examples: restaurant, hospital, park, airport, hotel");
+        } else if (radius > 50000) {
+            strcpy(result_text, "Radius too large. Maximum is 50000 meters (50km).");
+        } else {
+            char http_response[MAX_HTTP_RESPONSE_SIZE];
+            size_t len = overpass_search_poi(category, lon, lat, radius,
+                                             http_response, sizeof(http_response));
+
+            if (len > 0) {
+                // Return Overpass JSON - TypeScript side will parse and visualize
+                snprintf(result_text, sizeof(result_text),
+                         "type,category,centerLon,centerLat,radius,overpassJson\n"
+                         "poi,%s,%.6f,%.6f,%.1f,%s",
+                         category, lon, lat, radius, http_response);
+            } else {
+                snprintf(result_text, sizeof(result_text),
+                         "No %s found within %.0fm of the location.", category, radius);
+            }
+        }
+    }
+    else if (strcmp(tool_name, "getIsochrone") == 0) {
+        // Get reachable area within time
+        char location[256] = "";
+        char mode[32] = "walking";
+        char api_key[128] = "";
+        double lon = 0, lat = 0;
+        double minutes = 15;
+
+        json_get_string(args_json, "location", location, sizeof(location));
+        json_get_string(args_json, "mode", mode, sizeof(mode));
+        json_get_string(args_json, "apiKey", api_key, sizeof(api_key));
+        json_get_number(args_json, "longitude", lon);
+        json_get_number(args_json, "latitude", lat);
+        json_get_number(args_json, "minutes", minutes);
+
+        // Resolve location name
+        if (location[0] != '\0') {
+            double heading;
+            if (!resolve_location(location, lon, lat, heading)) {
+                if (camera_state_valid) {
+                    lon = camera_target_longitude;
+                    lat = camera_target_latitude;
+                }
+            }
+        } else if (lon == 0 && lat == 0 && camera_state_valid) {
+            lon = camera_target_longitude;
+            lat = camera_target_latitude;
+        }
+
+        if (api_key[0] == '\0') {
+            strcpy(result_text, "API key required for isochrones. Get a free key at https://openrouteservice.org/");
+        } else {
+            const char* profile = "foot-walking";
+            if (strcmp(mode, "cycling") == 0) profile = "cycling-regular";
+            else if (strcmp(mode, "driving") == 0) profile = "driving-car";
+
+            int range_seconds = (int)(minutes * 60);
+
+            char http_response[MAX_HTTP_RESPONSE_SIZE];
+            size_t len = ors_get_isochrone(api_key, lon, lat, range_seconds, profile,
+                                           http_response, sizeof(http_response));
+
+            if (len > 0) {
+                snprintf(result_text, sizeof(result_text),
+                         "type,centerLon,centerLat,minutes,mode,geojson\n"
+                         "isochrone,%.6f,%.6f,%.1f,%s,%s",
+                         lon, lat, minutes, mode, http_response);
+            } else {
+                strcpy(result_text, "Failed to get isochrone from OpenRouteService.");
+            }
+        }
+    }
+    // ========================================================================
+    // COMPOUND TOOLS (combine routing/POI with visualization)
+    // ========================================================================
+    else if (strcmp(tool_name, "walkTo") == 0 || strcmp(tool_name, "driveTo") == 0) {
+        // Animated route with model
+        bool is_walking = (strcmp(tool_name, "walkTo") == 0);
+        char start_location[256] = "";
+        char end_location[256] = "";
+        char api_key[128] = "";
+        char model_url[512] = "";
+        double start_lon = 0, start_lat = 0, end_lon = 0, end_lat = 0;
+        double duration = 30;
+
+        json_get_string(args_json, "startLocation", start_location, sizeof(start_location));
+        json_get_string(args_json, "endLocation", end_location, sizeof(end_location));
+        json_get_string(args_json, "apiKey", api_key, sizeof(api_key));
+        json_get_string(args_json, "modelUrl", model_url, sizeof(model_url));
+        json_get_number(args_json, "startLon", start_lon);
+        json_get_number(args_json, "startLat", start_lat);
+        json_get_number(args_json, "endLon", end_lon);
+        json_get_number(args_json, "endLat", end_lat);
+        json_get_number(args_json, "duration", duration);
+
+        // Resolve locations
+        if (start_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(start_location, start_lon, start_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve start location: %s", start_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+        if (end_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(end_location, end_lon, end_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve end location: %s", end_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+
+        const char* ors_profile = is_walking ? "foot-walking" : "driving-car";
+        const char* mode = is_walking ? "walking" : "driving";
+
+        char http_response[MAX_HTTP_RESPONSE_SIZE];
+        size_t len = 0;
+
+        // Try OSRM first if no API key provided
+        if (api_key[0] == '\0') {
+            len = osrm_get_directions(start_lon, start_lat, end_lon, end_lat,
+                                      mode, http_response, sizeof(http_response));
+        }
+
+        // Fall back to ORS if we have an API key or OSRM failed
+        if (len == 0 && api_key[0] != '\0') {
+            len = ors_get_directions(api_key, start_lon, start_lat, end_lon, end_lat,
+                                     ors_profile, http_response, sizeof(http_response));
+        }
+
+        if (len > 0) {
+            // Return animated route command
+            snprintf(result_text, sizeof(result_text),
+                     "type,startLon,startLat,endLon,endLat,mode,duration,modelUrl,animate,geojson\n"
+                     "animatedRoute,%.6f,%.6f,%.6f,%.6f,%s,%.1f,%s,true,%s",
+                     start_lon, start_lat, end_lon, end_lat, mode, duration,
+                     model_url[0] ? model_url : "", http_response);
+        } else if (api_key[0] == '\0') {
+            strcpy(result_text, "No routing backend available. Either start a local OSRM server (docker run -p 5000:5000 osrm/osrm-backend) or provide an apiKey for OpenRouteService.");
+        } else {
+            strcpy(result_text, "Failed to get route. Check API key and try again.");
+        }
+    }
+    else if (strcmp(tool_name, "flyPathTo") == 0) {
+        // Great circle flight animation
+        char start_location[256] = "";
+        char end_location[256] = "";
+        char model_url[512] = "";
+        double start_lon = 0, start_lat = 0, end_lon = 0, end_lat = 0;
+        double altitude = 10000;
+        double duration = 30;
+
+        json_get_string(args_json, "startLocation", start_location, sizeof(start_location));
+        json_get_string(args_json, "endLocation", end_location, sizeof(end_location));
+        json_get_string(args_json, "modelUrl", model_url, sizeof(model_url));
+        json_get_number(args_json, "startLon", start_lon);
+        json_get_number(args_json, "startLat", start_lat);
+        json_get_number(args_json, "endLon", end_lon);
+        json_get_number(args_json, "endLat", end_lat);
+        json_get_number(args_json, "altitude", altitude);
+        json_get_number(args_json, "duration", duration);
+
+        // Resolve locations
+        if (start_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(start_location, start_lon, start_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve start location: %s", start_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+        if (end_location[0] != '\0') {
+            double heading;
+            if (!resolve_location(end_location, end_lon, end_lat, heading)) {
+                snprintf(result_text, sizeof(result_text),
+                         "Could not resolve end location: %s", end_location);
+                char result[65536];
+                format_tool_result(result_text, true, result, sizeof(result));
+                return create_success_response(id, result, response, response_size);
+            }
+        }
+
+        // Return great circle flight command (no external API needed)
+        snprintf(result_text, sizeof(result_text),
+                 "type,startLon,startLat,endLon,endLat,altitude,duration,modelUrl\n"
+                 "flightPath,%.6f,%.6f,%.6f,%.6f,%.1f,%.1f,%s",
+                 start_lon, start_lat, end_lon, end_lat, altitude, duration,
+                 model_url[0] ? model_url : "");
+    }
+    else if (strcmp(tool_name, "findAndShow") == 0) {
+        // Search POI and visualize
+        char category[64] = "";
+        char location[256] = "";
+        char marker_color[32] = "cyan";
+        double lon = 0, lat = 0;
+        double radius = 1000;
+        bool show_labels = true;
+
+        json_get_string(args_json, "category", category, sizeof(category));
+        json_get_string(args_json, "location", location, sizeof(location));
+        json_get_string(args_json, "markerColor", marker_color, sizeof(marker_color));
+        json_get_number(args_json, "longitude", lon);
+        json_get_number(args_json, "latitude", lat);
+        json_get_number(args_json, "radius", radius);
+
+        // Check for showLabels boolean
+        char show_labels_str[16] = "";
+        if (json_get_string(args_json, "showLabels", show_labels_str, sizeof(show_labels_str))) {
+            show_labels = (strcmp(show_labels_str, "false") != 0 && strcmp(show_labels_str, "0") != 0);
+        }
+
+        // Resolve location name
+        if (location[0] != '\0') {
+            double heading;
+            if (!resolve_location(location, lon, lat, heading)) {
+                if (camera_state_valid) {
+                    lon = camera_target_longitude;
+                    lat = camera_target_latitude;
+                }
+            }
+        } else if (lon == 0 && lat == 0 && camera_state_valid) {
+            lon = camera_target_longitude;
+            lat = camera_target_latitude;
+        }
+
+        if (category[0] == '\0') {
+            strcpy(result_text, "Category required. Examples: restaurant, hospital, park, airport, hotel");
+        } else {
+            char http_response[MAX_HTTP_RESPONSE_SIZE];
+            size_t len = overpass_search_poi(category, lon, lat, radius,
+                                             http_response, sizeof(http_response));
+
+            if (len > 0) {
+                // Return POI with visualization options
+                snprintf(result_text, sizeof(result_text),
+                         "type,category,centerLon,centerLat,radius,markerColor,showLabels,flyTo,overpassJson\n"
+                         "poiVisualize,%s,%.6f,%.6f,%.1f,%s,%s,true,%s",
+                         category, lon, lat, radius, marker_color,
+                         show_labels ? "true" : "false", http_response);
+            } else {
+                snprintf(result_text, sizeof(result_text),
+                         "No %s found within %.0fm of the location.", category, radius);
+            }
         }
     }
     else {

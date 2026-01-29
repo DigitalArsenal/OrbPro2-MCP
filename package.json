@@ -4,7 +4,11 @@
   "description": "Browser-based Small Language Model for controlling CesiumJS via natural language",
   "type": "module",
   "scripts": {
-    "dev": "npm run build:wasm && vite",
+    "dev": "npm run build:wasm && npm run services:start && vite",
+    "dev:no-services": "npm run build:wasm && vite",
+    "services:start": "./scripts/start-services.sh",
+    "services:stop": "cd packages/local-services && docker compose down",
+    "services:setup": "cd packages/local-services && ./scripts/setup.sh",
     "build": "npm run build:wasm && tsc && vite build",
     "build:wasm": "cd packages/mcp-server-cpp && ./scripts/build-wasm.sh",
     "preview": "vite preview",

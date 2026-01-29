@@ -19,6 +19,8 @@ export interface LLMConfig {
   contextWindowSize?: number;
   /** Use compact system prompt for models with small context windows */
   useCompactPrompt?: boolean;
+  /** Override system prompt entirely (for custom fine-tuned models that were trained with a specific prompt) */
+  customSystemPrompt?: string;
   onProgress?: (progress: InitProgressReport) => void;
 }
 
@@ -53,16 +55,10 @@ export interface ToolCall {
 export const RECOMMENDED_MODELS = {
   // Best models for function calling (recommended)
   recommended: [
+    'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC', // Custom trained 0.5B for Cesium (~600MB)
+    'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC', // Custom trained 1.5B for Cesium (~851MB)
     'Llama-3.2-3B-Instruct-q4f16_1-MLC',  // Best function calling at 3B size (~2GB)
     'Hermes-3-Llama-3.2-3B-q4f16_1-MLC',  // Fine-tuned for tool use (~2GB)
-  ],
-  // Our fine-tuned model - trained on Cesium command examples
-  trained: [
-    'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC', // Custom trained 1.5B (851MB)
-  ],
-  // Fallback to Llama for function calling
-  fallback: [
-    'Llama-3.2-3B-Instruct-q4f16_1-MLC',
   ],
   // Smaller, faster models (less accurate for function calling)
   small: [
@@ -82,8 +78,6 @@ export const RECOMMENDED_MODELS = {
     'Mistral-7B-Instruct-v0.3-q4f16_1-MLC',
     'Llama-3.1-8B-Instruct-q4f16_1-MLC',
   ],
-  // Custom/self-compiled models (add your own after compilation)
-  custom: [] as string[],
 } as const;
 
 // Custom model configurations for self-hosted models
@@ -106,12 +100,13 @@ export const CUSTOM_MODEL_REGISTRY: Record<string, CustomModelConfig> = {
     vramRequired: 1024,
     contextWindowSize: 4096,
   },
-  // OrbPro OrbPro2 MCP 0.5B (legacy - broken)
-  'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC': {
-    modelId: 'OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC',
-    modelLibUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC.wasm',
-    modelWeightsUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f16_1-MLC/',
-    vramRequired: 512,
+  // OrbPro Cesium SLM 0.5B - Fine-tuned on 100K CSV Cesium command examples
+  // Uses q8f16_1 (8-bit) because q4 is too aggressive for 0.5B structured output
+  'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC': {
+    modelId: 'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC',
+    modelLibUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC.wasm',
+    modelWeightsUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC/',
+    vramRequired: 600,
     contextWindowSize: 4096,
   },
 };
@@ -264,6 +259,13 @@ export class WebLLMEngine {
   }
 
   private updateSystemPrompt(): void {
+    // Custom fine-tuned models use the exact system prompt they were trained with
+    // (they already have tool knowledge baked in from training data)
+    if (this.config.customSystemPrompt) {
+      this.systemPrompt = this.config.customSystemPrompt;
+      return;
+    }
+
     // Build system prompt with tool definitions if available
     if (this.tools.length === 0) {
       return;
@@ -293,7 +295,7 @@ export class WebLLMEngine {
     // Add user message
     messages.push({ role: 'user', content: userMessage });
 
-    console.log('[WebLLM] Sending with system prompt:', this.systemPrompt ? 'yes' : 'no');
+    console.log('[WebLLM] System prompt (' + this.systemPrompt.length + ' chars):', this.systemPrompt.substring(0, 100));
 
     const response = await this.engine.chat.completions.create({
       messages,
@@ -375,10 +377,84 @@ export class WebLLMEngine {
     };
   }
 
+  /**
+   * CSV column schemas for each MCP tool.
+   * Format: toolName → ordered list of parameter names.
+   * Parser maps positional CSV fields to named arguments.
+   */
+  private static readonly CSV_SCHEMAS: Record<string, string[]> = {
+    // Navigation
+    flyToLocation: ['location', 'height', 'duration'],
+    flyTo: ['longitude', 'latitude', 'height', 'duration'],
+    lookAt: ['longitude', 'latitude', 'range'],
+    zoom: ['amount'],
+    setView: ['longitude', 'latitude', 'height'],
+    getCamera: [],
+
+    // Entity creation (named location)
+    addPointAtLocation: ['location', 'color'],
+    addSphereAtLocation: ['location', 'radius', 'color', 'height'],
+    addBoxAtLocation: ['location', 'dimensionX', 'dimensionY', 'dimensionZ', 'color', 'heading'],
+    addLabelAtLocation: ['location', 'text'],
+    addSensorConeAtLocation: ['location', 'radius', 'horizontalAngle', 'verticalAngle', 'heading', 'pitch', 'color', 'opacity'],
+
+    // Entity creation (coordinates)
+    addPoint: ['longitude', 'latitude', 'name', 'color'],
+    addSphere: ['longitude', 'latitude', 'radius', 'color', 'height'],
+    addBox: ['longitude', 'latitude', 'dimensionX', 'dimensionY', 'dimensionZ', 'color'],
+    addLabel: ['longitude', 'latitude', 'text'],
+    addCircle: ['longitude', 'latitude', 'radius', 'color'],
+    addCylinder: ['longitude', 'latitude', 'length', 'topRadius', 'bottomRadius', 'color'],
+    addSensorCone: ['longitude', 'latitude', 'radius', 'horizontalAngle', 'verticalAngle', 'heading', 'pitch', 'color', 'opacity'],
+
+    // Entity "here"
+    addSphereHere: ['radius', 'color'],
+    addBoxHere: ['dimensionX', 'dimensionY', 'dimensionZ', 'color'],
+    addPointHere: ['color'],
+    addLabelHere: ['text'],
+    addCircleHere: ['radius', 'color'],
+    addSensorConeHere: ['radius', 'horizontalAngle', 'verticalAngle', 'heading', 'color', 'opacity'],
+
+    // Routing & animation
+    walkTo: ['startLocation', 'endLocation', 'duration'],
+    driveTo: ['startLocation', 'endLocation', 'duration'],
+    flyPathTo: ['startLocation', 'endLocation', 'altitude', 'duration'],
+    getRoute: ['startLocation', 'endLocation', 'mode'],
+    getIsochrone: ['location', 'minutes', 'mode'],
+
+    // POI
+    searchPOI: ['category', 'location', 'radius'],
+    findAndShow: ['category', 'location', 'radius', 'markerColor'],
+
+    // Entity management
+    removeEntity: ['id'],
+    clearAll: [],
+    showEntity: ['id'],
+    hideEntity: ['id'],
+    flyToEntity: ['id', 'duration'],
+    rotateEntity: ['id', 'heading'],
+    resizeEntity: ['id', 'scale'],
+    setEntityStyle: ['id', 'color', 'opacity'],
+    moveEntity: ['id', 'longitude', 'latitude'],
+
+    // Scene
+    setSceneMode: ['mode'],
+    setTime: ['iso8601'],
+    playAnimation: [],
+    pauseAnimation: [],
+    setImagery: ['provider'],
+    setTerrain: ['provider'],
+
+    // Data
+    showTopCitiesByPopulation: ['count', 'color', 'shape'],
+    resolveLocation: ['location'],
+    addPolyline: ['color', 'width'],
+  };
+
   private parseToolCalls(content: string): ToolCall[] {
     const toolCalls: ToolCall[] = [];
 
-    // Try to parse as JSON first (for clean tool responses)
+    // Try to parse as JSON first (for API models that output JSON)
     try {
       const parsed = JSON.parse(content.trim());
       if (parsed.tool && parsed.arguments) {
@@ -389,7 +465,7 @@ export class WebLLMEngine {
         return toolCalls;
       }
     } catch {
-      // Not pure JSON, try to extract JSON from the response
+      // Not pure JSON, try other formats
     }
 
     // Look for JSON objects in the response
@@ -412,38 +488,59 @@ export class WebLLMEngine {
       }
     }
 
-    // Parse FunctionGemma format: <start_function_call>call:function_name{params}<end_function_call>
-    const functionGemmaRegex = /<start_function_call>call:(\w+)\{([^}]*)\}<end_function_call>/g;
-    let fgMatch;
-    while ((fgMatch = functionGemmaRegex.exec(content)) !== null) {
-      const functionName = fgMatch[1];
-      const paramsStr = fgMatch[2];
+    // If JSON parsing found results, return them
+    if (toolCalls.length > 0) return toolCalls;
 
-      if (!functionName || paramsStr === undefined) continue;
+    // Try CSV format: toolName,param1,param2,...
+    // This is the preferred format for small browser models (fewer tokens)
+    const csvResult = this.parseCSVToolCall(content.trim());
+    if (csvResult) {
+      toolCalls.push(csvResult);
+      return toolCalls;
+    }
 
-      // Parse key:value pairs from FunctionGemma format
-      const args: Record<string, unknown> = {};
-      const paramPairs = paramsStr.split(',').map(p => p.trim()).filter(p => p);
-      for (const pair of paramPairs) {
-        const colonIdx = pair.indexOf(':');
-        if (colonIdx > 0) {
-          const key = pair.substring(0, colonIdx).trim();
-          let value: unknown = pair.substring(colonIdx + 1).trim();
-          // Try to parse as number or boolean
-          if (value === 'true') value = true;
-          else if (value === 'false') value = false;
-          else if (!isNaN(Number(value))) value = Number(value);
-          args[key] = value;
-        }
+    // Try to find CSV in multiline output (model might add explanation text)
+    const lines = content.trim().split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Skip empty lines and lines that look like natural language
+      if (!trimmed || trimmed.includes('  ') || trimmed.startsWith('I ') || trimmed.startsWith('The ')) continue;
+      const result = this.parseCSVToolCall(trimmed);
+      if (result) {
+        toolCalls.push(result);
+        break; // Take first valid CSV line
       }
-
-      toolCalls.push({
-        name: functionName,
-        arguments: args,
-      });
     }
 
     return toolCalls;
+  }
+
+  /**
+   * Parse a single CSV tool call line: toolName,param1,param2,...
+   */
+  private parseCSVToolCall(line: string): ToolCall | null {
+    // Must contain a comma or be a no-arg tool
+    const parts = line.split(',').map(s => s.trim());
+    if (parts.length === 0) return null;
+
+    const toolName = parts[0]!;
+    const schema = WebLLMEngine.CSV_SCHEMAS[toolName];
+    if (!schema) return null; // Unknown tool name
+
+    const args: Record<string, unknown> = {};
+    for (let i = 0; i < schema.length && i + 1 < parts.length; i++) {
+      const value = parts[i + 1];
+      if (value === undefined || value === '') continue; // Skip empty optional params
+
+      const key = schema[i]!;
+      // Auto-type: numbers, booleans, or strings
+      if (value === 'true') args[key] = true;
+      else if (value === 'false') args[key] = false;
+      else if (!isNaN(Number(value)) && value !== '') args[key] = Number(value);
+      else args[key] = value;
+    }
+
+    return { name: toolName, arguments: args };
   }
 
   async reset(): Promise<void> {

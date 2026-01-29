@@ -12,6 +12,7 @@ set(SOURCES
     src/mcp_server.cpp
     src/location_database.cpp
     src/json_rpc.cpp
+    src/http_client.cpp
     src/main.cpp
 )
 
@@ -21,6 +22,7 @@ set(HEADERS
     include/location_database.h
     include/json_rpc.h
     include/cesium_commands.h
+    include/http_client.h
 )
 
 # Add executable
@@ -56,6 +58,9 @@ if(EMSCRIPTEN)
             -s PROXY_TO_PTHREAD=0 \
             -s ENVIRONMENT='web,worker' \
             -s FILESYSTEM=0 \
+            -s FETCH=1 \
+            -s ASYNCIFY=1 \
+            -s ASYNCIFY_STACK_SIZE=65536 \
             -s NO_EXIT_RUNTIME=1 \
             -s ASSERTIONS=1 \
             -s STACK_SIZE=1048576 \

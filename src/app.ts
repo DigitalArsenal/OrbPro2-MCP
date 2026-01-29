@@ -3,7 +3,7 @@
  * Integrates WebLLM, MCP Server, and CesiumJS for natural language globe control
  */
 
-import { WebLLMEngine, checkWebGPUSupport, RECOMMENDED_MODELS } from './llm/web-llm-engine';
+import { WebLLMEngine, checkWebGPUSupport, RECOMMENDED_MODELS, CUSTOM_MODEL_REGISTRY } from './llm/web-llm-engine';
 import { APILLMEngine } from './llm/api-llm-engine';
 import { CommandParser } from './llm/command-parser';
 import { CesiumCommandExecutor } from './cesium/command-executor';
@@ -11,6 +11,7 @@ import { WasmMCPServer } from './mcp/wasm-mcp-server';
 import { ChatInterface } from './ui/chat-interface';
 import { StatusDisplay } from './ui/status-display';
 import { ModelSelector, ModelSelection } from './ui/model-selector';
+import { initSettingsPanel, getApiKey } from './ui/settings-panel';
 import type { CesiumCommand } from './cesium/types';
 
 // Union type for LLM engines
@@ -94,7 +95,9 @@ export class CesiumSLMApp {
   }): Promise<void> {
     // Initialize status display first
     try {
-      this.statusDisplay = new StatusDisplay(config.statusContainer);
+      this.statusDisplay = new StatusDisplay(config.statusContainer, {
+        onModelReset: () => this.modelSelector?.reset(),
+      });
     } catch (error) {
       throw new Error(`StatusDisplay init failed: ${error instanceof Error ? error.message : error}`);
     }
@@ -122,9 +125,17 @@ export class CesiumSLMApp {
       this.modelSelector = new ModelSelector({
         containerId: config.modelSelectorContainer,
         onSelect: (selection: ModelSelection) => this.loadModel(selection),
+        onReset: () => this.resetModel(),
       });
     } catch (error) {
       throw new Error(`ModelSelector init failed: ${error instanceof Error ? error.message : error}`);
+    }
+
+    // Initialize settings panel (gear icon in header)
+    try {
+      initSettingsPanel();
+    } catch (error) {
+      console.warn('Settings panel init failed:', error);
     }
 
     // Initialize CesiumJS
@@ -316,12 +327,20 @@ export class CesiumSLMApp {
 
       } else {
         // Browser-based WebLLM model
+        // Custom fine-tuned models need low temperature for deterministic structured output
+        // and must use the exact system prompt they were trained with
+        const isCustomModel = selection.modelId in CUSTOM_MODEL_REGISTRY;
         this.llmEngine = new WebLLMEngine({
           modelId: selection.modelId,
-          temperature: 0.7,
-          topP: 0.9,
+          temperature: isCustomModel ? 0.1 : 0.7,
+          topP: isCustomModel ? 0.9 : 0.9,
           maxTokens: 512,
-          useCompactPrompt: true,
+          frequencyPenalty: isCustomModel ? 0 : 0.5,
+          presencePenalty: isCustomModel ? 0 : 0.5,
+          useCompactPrompt: !isCustomModel,
+          customSystemPrompt: isCustomModel
+            ? 'You are a CesiumJS controller assistant. Convert natural language commands to tool calls.'
+            : undefined,
           onProgress: (progress) => {
             this.statusDisplay?.updateModel({
               loading: true,
@@ -370,6 +389,37 @@ export class CesiumSLMApp {
         isError: true,
       });
     }
+  }
+
+  /**
+   * Reset (unload) the current model
+   */
+  private async resetModel(): Promise<void> {
+    if (this.llmEngine) {
+      try {
+        await this.llmEngine.unload();
+      } catch {
+        // Ignore unload errors
+      }
+      this.llmEngine = null;
+    }
+
+    this.currentModelSelection = null;
+
+    this.statusDisplay?.updateModel({
+      loaded: false,
+      loading: false,
+      name: undefined,
+    });
+
+    // Show model selector for new selection
+    this.modelSelector?.show();
+
+    this.chatInterface?.addMessage({
+      role: 'system',
+      content: 'Model unloaded. Please select a new model to continue.',
+      timestamp: new Date(),
+    });
   }
 
   private async handleUserMessage(message: string): Promise<void> {
@@ -423,7 +473,9 @@ export class CesiumSLMApp {
         const toolResults: Array<{ name: string; success: boolean; message: string }> = [];
         for (const toolCall of response.toolCalls) {
           if (this.mcpServer) {
-            const result = await this.mcpServer.executeToolDirect(toolCall.name, toolCall.arguments);
+            // Inject API keys for routing tools that need them
+            const args = this.injectApiKeys(toolCall.name, toolCall.arguments);
+            const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
             toolResults.push({ name: toolCall.name, ...result });
             console.log(`Tool ${toolCall.name} result:`, result);
           }
@@ -458,6 +510,27 @@ export class CesiumSLMApp {
         isError: true,
       });
     }
+  }
+
+  /**
+   * Inject API keys from settings into tool arguments for tools that need them
+   */
+  private injectApiKeys(toolName: string, args: unknown): unknown {
+    // Tools that require OpenRouteService API key
+    const orsTools = ['getRoute', 'getIsochrone', 'walkTo', 'driveTo', 'bikeTo'];
+
+    if (orsTools.includes(toolName)) {
+      const orsKey = getApiKey('openRouteService');
+      if (orsKey) {
+        // Add API key to arguments if not already provided
+        const argsObj = (args && typeof args === 'object') ? args as Record<string, unknown> : {};
+        if (!argsObj.apiKey) {
+          return { ...argsObj, apiKey: orsKey };
+        }
+      }
+    }
+
+    return args;
   }
 
   private async executeCommands(commands: CesiumCommand[]): Promise<void> {
