@@ -162,12 +162,22 @@ if [ "$SKIP_TRAIN" = false ]; then
 
     cd "$TRAINING_DIR"
 
-    python3 finetune_mlx.py \
+    # Calculate total iterations for progress display
+    BATCH_SIZE=4
+    TRAIN_EXAMPLES=$((EXAMPLE_COUNT * 9 / 10))  # 90% for training
+    STEPS_PER_EPOCH=$((TRAIN_EXAMPLES / BATCH_SIZE))
+    TOTAL_ITERS=$((STEPS_PER_EPOCH * EPOCHS))
+    echo -e "  Training ${TRAIN_EXAMPLES} examples for ${EPOCHS} epochs (${TOTAL_ITERS} iterations)"
+    echo ""
+
+    # Run training with clean progress output
+    python3 train_progress.py "$TOTAL_ITERS" \
+        python3 finetune_mlx.py \
         --model "$BASE_MODEL" \
         --dataset "$TRAINING_DATA" \
         --output-dir "$LORA_OUTPUT_DIR" \
         --num-epochs "$EPOCHS" \
-        --batch-size 4 \
+        --batch-size "$BATCH_SIZE" \
         --learning-rate 1e-5 \
         --lora-rank 16
 
