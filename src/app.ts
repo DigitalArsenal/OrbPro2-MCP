@@ -511,6 +511,7 @@ export class CesiumSLMApp {
               }
 
               args = this.injectApiKeys(toolCall.name, args) as Record<string, unknown>;
+              console.log(`Step ${i + 1} - ${toolCall.name} args:`, JSON.stringify(args));
               const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
               allToolCalls.push({ name: toolCall.name, arguments: args });
               console.log(`Step ${i + 1} - Tool ${toolCall.name} result:`, result);
@@ -545,6 +546,7 @@ export class CesiumSLMApp {
         if (toolCall && this.mcpServer) {
           let args = await this.geocodeToolArgs(message, toolCall.name, toolCall.arguments);
           args = this.injectApiKeys(toolCall.name, args) as Record<string, unknown>;
+          console.log(`Tool ${toolCall.name} args:`, JSON.stringify(args));
           const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
           console.log(`Tool ${toolCall.name} result:`, result);
 

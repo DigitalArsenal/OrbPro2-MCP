@@ -1,5 +1,5 @@
 {
-  "name": "cesium-slm",
+  "name": "orbpro2-mcp",
   "version": "1.0.0",
   "description": "Browser-based Small Language Model for controlling CesiumJS via natural language",
   "type": "module",
@@ -20,11 +20,11 @@
     "build:locations": "node scripts/build-location-database.mjs",
     "merge:locations": "node scripts/merge-location-databases.mjs",
     "fetch:geonames": "node scripts/fetch-geonames.mjs",
-    "train": "./scripts/train-cesium-slm.sh",
-    "train:0.5b": "./scripts/train-cesium-slm.sh --size 0.5B",
-    "train:1.5b": "./scripts/train-cesium-slm.sh --size 1.5B",
-    "train:3b": "./scripts/train-cesium-slm.sh --size 3B",
-    "train:compile-only": "./scripts/train-cesium-slm.sh --skip-train"
+    "train": "./scripts/train.sh",
+    "train:0.5b": "./scripts/train.sh --size 0.5B",
+    "train:1.5b": "./scripts/train.sh --size 1.5B",
+    "train:3b": "./scripts/train.sh --size 3B",
+    "train:compile-only": "./scripts/train.sh --skip-train"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.78",

@@ -123,6 +123,20 @@ const LOCATIONS: Location[] = [
   { name: 'Empire State Building', aliases: ['ESB'], longitude: -73.9857, latitude: 40.7484, height: 30000, type: 'landmark' },
   { name: 'Tower of Pisa', aliases: ['Leaning Tower', 'Pisa Tower'], longitude: 10.3963, latitude: 43.7230, height: 20000, type: 'landmark' },
   { name: 'Stonehenge', aliases: ['the Stonehenge'], longitude: -1.8262, latitude: 51.1789, height: 30000, type: 'landmark' },
+  { name: 'Vatican', aliases: ['the Vatican', 'Vatican City', 'the Holy See', 'St Peters Basilica'], longitude: 12.4534, latitude: 41.9029, height: 20000, type: 'landmark' },
+  { name: 'Acropolis', aliases: ['the Acropolis', 'Acropolis of Athens', 'Parthenon'], longitude: 23.7257, latitude: 37.9715, height: 20000, type: 'landmark' },
+  { name: 'Brandenburg Gate', aliases: ['the Brandenburg Gate', 'Brandenburger Tor'], longitude: 13.3777, latitude: 52.5163, height: 20000, type: 'landmark' },
+  { name: 'Louvre', aliases: ['the Louvre', 'Louvre Museum'], longitude: 2.3376, latitude: 48.8606, height: 20000, type: 'landmark' },
+  { name: 'Kremlin', aliases: ['the Kremlin', 'Moscow Kremlin'], longitude: 37.6176, latitude: 55.7520, height: 30000, type: 'landmark' },
+  { name: 'Forbidden City', aliases: ['the Forbidden City'], longitude: 116.3972, latitude: 39.9169, height: 30000, type: 'landmark' },
+  { name: 'Tower of London', aliases: ['the Tower of London', 'Tower London'], longitude: -0.0761, latitude: 51.5081, height: 20000, type: 'landmark' },
+  { name: 'Arc de Triomphe', aliases: ['the Arc de Triomphe', 'Arch of Triumph'], longitude: 2.2950, latitude: 48.8738, height: 20000, type: 'landmark' },
+  { name: 'Buckingham Palace', aliases: ['the Palace', 'Buckingham'], longitude: -0.1419, latitude: 51.5014, height: 20000, type: 'landmark' },
+  { name: 'Sagrada Familia', aliases: ['the Sagrada Familia', 'La Sagrada Familia'], longitude: 2.1744, latitude: 41.4036, height: 20000, type: 'landmark' },
+  { name: 'Leaning Tower of Pisa', aliases: ['the Leaning Tower', 'Tower of Pisa'], longitude: 10.3963, latitude: 43.7230, height: 20000, type: 'landmark' },
+  { name: 'Angkor Wat', aliases: ['the Angkor Wat', 'Angkor Temple'], longitude: 103.8670, latitude: 13.4125, height: 30000, type: 'landmark' },
+  { name: 'Chichen Itza', aliases: ['Chichen Itza pyramid', 'the Mayan ruins'], longitude: -88.5686, latitude: 20.6843, height: 30000, type: 'landmark' },
+  { name: 'Petra', aliases: ['the Petra', 'Treasury of Petra'], longitude: 35.4444, latitude: 30.3285, height: 30000, type: 'landmark' },
 
   // Scientific Facilities & Research Centers
   { name: 'CERN', aliases: ['the Large Hadron Collider', 'LHC', 'CERN Geneva'], longitude: 6.0536, latitude: 46.2330, height: 30000, type: 'landmark' },
@@ -260,6 +274,11 @@ function applyVariedPhrasing(text: string): string {
 }
 
 function getLocationName(loc: Location): string {
+  // For landmarks/natural features, use aliases more often (they often include "the")
+  // This helps differentiate "fly to the Grand Canyon" (location) from "fly to the Grand Canyon Marker" (entity)
+  if ((loc.type === 'landmark' || loc.type === 'natural') && loc.aliases.length > 0) {
+    return Math.random() > 0.4 ? loc.name : randomChoice([loc.name, ...loc.aliases]);
+  }
   return Math.random() > 0.3 ? loc.name : randomChoice([loc.name, ...loc.aliases]);
 }
 
@@ -283,6 +302,11 @@ const FLY_TO_TEMPLATES = [
   'Visit {location}', 'Show {location} on the map', 'Fly over {location}',
   'What does {location} look like?', 'How do I see {location}?', 'Take me there',
   'Go there', 'Fly there', 'Show me that place', 'Navigate there',
+  // IMPORTANT: Templates with "the" for natural landmark names (prevents confusion with flyToEntity)
+  'Fly to the {location}', 'Take me to the {location}', 'Go to the {location}',
+  'Navigate to the {location}', 'Show me the {location}', 'Can you fly to the {location}?',
+  'I want to visit the {location}', 'Head to the {location}', 'Travel to the {location}',
+  'Let me see the {location}', 'Bring me to the {location}', 'View the {location}',
 ];
 
 function generateFlyTo(): Example {
@@ -2050,8 +2074,9 @@ function generateTrainingData(count: number): Example[] {
     // CZML generation - boosted
     { fn: generateGenerateCZML, weight: 4 },  // boosted
 
-    // Compound commands
-    { fn: generateCompoundExample, weight: 8 },
+    // Compound commands - DISABLED: NLP decomposer now handles multi-step commands
+    // The model should only learn atomic commands; complex inputs are split by NLP layer
+    // { fn: generateCompoundExample, weight: 8 },
 
     // Conversational follow-ups
     { fn: generateConversationalFollowup, weight: 6 },

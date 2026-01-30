@@ -37,14 +37,14 @@ npm-debug.log*
 # Python venv (created by train-and-compile.sh)
 .venv/
 
-# Training data (generated, can regenerate with npx tsx training/generate-mcp-training-data.ts)
-training/*.jsonl
-training/*.yaml
+# Training artifacts (models, weights, venvs - NOT training data)
 training/*.bin
 training/*.safetensors
 training/.venv/
+training/venv/
 training/finetune/output/
 training/cesium-qwen-*/
+training/orbpro2-lora-*/
 
 # MLC compiled models (download or compile separately)
 mlc-models/

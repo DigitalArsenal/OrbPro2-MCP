@@ -350,9 +350,9 @@ export class ModelSelector {
       'llama-3-3-70b-instruct': 'Llama 3.3 (~544 tok/s)',
       'llama-3-1-405b-instruct': 'Llama 405B',
       'qwen-2-5-72b-instruct': 'Qwen 72B',
-      // WebLLM - Custom trained
-      'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC': '⭐ Custom trained for Cesium (~600MB)',
-      'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC': '⭐ Custom trained for Cesium (~851MB)',
+      // WebLLM - Custom trained OrbPro2 MCP
+      'OrbPro2-MCP-0.5B-q4f32_1-MLC': '⭐ OrbPro2 0.5B (~600MB)',
+      'OrbPro2-MCP-1.5B-q4f32_1-MLC': '⭐ OrbPro2 1.5B (~1GB)',
       // WebLLM
       'Llama-3.2-3B-Instruct-q4f16_1-MLC': 'Best for tool use (~2GB)',
       'Hermes-3-Llama-3.2-3B-q4f16_1-MLC': 'Function calling (~2GB)',

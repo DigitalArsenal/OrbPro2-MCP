@@ -104,8 +104,8 @@ const INTENT_PATTERNS: Record<CommandIntent, RegExp[]> = {
     /\bPOI\b/i,
   ],
   add_entity: [
-    /\b(add|create|put|place|drop|insert|draw|make)\s+(a|an|the)?\s*(sphere|marker|point|label|line|polygon|circle|box|model|arrow)/i,
-    /\b(sphere|marker|point|label|line|polygon|circle|box|model|arrow)\s+(at|on|there|here)/i,
+    /\b(add|create|put|place|drop|insert|draw|make)\s+(a|an|the)?\s*(sphere|marker|point|label|line|path|polyline|polygon|circle|box|cylinder|model|arrow)/i,
+    /\b(sphere|marker|point|label|line|path|polyline|polygon|circle|box|cylinder|model|arrow)\s+(at|on|there|here)/i,
   ],
   modify_entity: [
     /\b(change|modify|update|edit|set|make)\s+(the|it|that)?\s*(color|size|position|height|rotation)/i,
@@ -156,6 +156,20 @@ function classifyIntent(text: string): CommandIntent {
         scores[intent as CommandIntent] += 1;
       }
     }
+  }
+
+  // Priority overrides before scoring:
+
+  // "zoom into/to X" is navigation, not camera_control
+  if (/\bzoom\s+(in\s+)?(to|into)\s+/i.test(text)) {
+    scores.navigate += 2;
+    scores.camera_control = 0;
+  }
+
+  // "draw/add/create a line/path/polyline from X to Y" is add_entity, not calculate_route
+  if (/\b(draw|add|create|make)\b/i.test(text) && /\b(line|path|polyline|dashed\s+line)\b/i.test(text)) {
+    scores.add_entity += 3;
+    scores.calculate_route = 0;
   }
 
   // Find highest scoring intent
@@ -333,7 +347,7 @@ function splitOnAndBetweenActions(clause: string, actionVerbPattern: string): st
 const LOCATION_PREPOSITIONS = ['to', 'at', 'in', 'near', 'from', 'between', 'towards', 'around', 'by', 'on the way to'];
 
 // Object types we can create
-const OBJECT_TYPES = ['sphere', 'marker', 'point', 'label', 'line', 'path', 'route', 'polygon', 'circle', 'box', 'model', 'arrow', 'corridor', 'wall'];
+const OBJECT_TYPES = ['sphere', 'marker', 'point', 'label', 'line', 'path', 'route', 'polygon', 'circle', 'box', 'cylinder', 'model', 'arrow', 'corridor', 'wall'];
 
 // Attributes
 const COLOR_WORDS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'cyan', 'white', 'black', 'magenta', 'lime', 'navy', 'teal', 'gold', 'silver', 'coral'];

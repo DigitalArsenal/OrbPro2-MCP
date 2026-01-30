@@ -230,8 +230,8 @@ export class WasmMCPServer {
       if (csvResult && 'type' in csvResult.meta) {
         console.log(`[WasmMCPServer] Tool '${name}' returned CSV:`, csvResult.meta.type, csvResult.rows ? `(${csvResult.rows.length} rows)` : '');
 
-        // Convert WASM CSV output to executor format
-        const cesiumCommand = this.mapWasmCommandToExecutor(csvResult.meta, csvResult.rows);
+        // Convert WASM CSV output to executor format, passing original args for fallback
+        const cesiumCommand = this.mapWasmCommandToExecutor(csvResult.meta, csvResult.rows, args as Record<string, unknown>);
         console.log(`[WasmMCPServer] Mapped to CesiumCommand:`, cesiumCommand);
 
         // Execute the command if we have an executor
@@ -349,7 +349,7 @@ export class WasmMCPServer {
    * WASM uses simple types like 'flyTo', 'addBox'
    * Executor expects namespaced types like 'camera.flyTo', 'entity.add'
    */
-  private mapWasmCommandToExecutor(wasmOutput: Record<string, unknown>, rows?: Array<Record<string, unknown>>): CesiumCommand {
+  private mapWasmCommandToExecutor(wasmOutput: Record<string, unknown>, rows?: Array<Record<string, unknown>>, originalArgs?: Record<string, unknown>): CesiumCommand {
     const type = wasmOutput.type as string;
 
     // Camera commands
@@ -604,8 +604,11 @@ export class WasmMCPServer {
     }
 
     if (type === 'addPolyline') {
-      // Positions come from CSV batch rows (section 2)
-      const positions = rows || [];
+      // Positions come from CSV batch rows (section 2), or fall back to original args
+      let positions: Array<Record<string, unknown>> = rows || [];
+      if (positions.length === 0 && originalArgs?.positions && Array.isArray(originalArgs.positions)) {
+        positions = originalArgs.positions as Array<Record<string, unknown>>;
+      }
       const degreesArray: number[] = [];
       for (const pos of positions) {
         degreesArray.push(pos.longitude as number, pos.latitude as number, (pos.height as number) || 0);
@@ -626,8 +629,11 @@ export class WasmMCPServer {
     }
 
     if (type === 'addPolygon') {
-      // Positions come from CSV batch rows (section 2)
-      const positions = rows || [];
+      // Positions come from CSV batch rows (section 2), or fall back to original args
+      let positions: Array<Record<string, unknown>> = rows || [];
+      if (positions.length === 0 && originalArgs?.positions && Array.isArray(originalArgs.positions)) {
+        positions = originalArgs.positions as Array<Record<string, unknown>>;
+      }
       const degreesArray: number[] = [];
       for (const pos of positions) {
         degreesArray.push(pos.longitude as number, pos.latitude as number, 0);

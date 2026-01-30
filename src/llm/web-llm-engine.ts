@@ -55,8 +55,8 @@ export interface ToolCall {
 export const RECOMMENDED_MODELS = {
   // Best models for function calling (recommended)
   recommended: [
-    'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC', // Custom trained 0.5B for Cesium (~600MB)
-    'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC', // Custom trained 1.5B for Cesium (~851MB)
+    'OrbPro2-MCP-0.5B-q4f32_1-MLC', // Custom trained 0.5B (~600MB)
+    'OrbPro2-MCP-1.5B-q4f32_1-MLC', // Custom trained 1.5B (~1GB)
     'Llama-3.2-3B-Instruct-q4f16_1-MLC',  // Best function calling at 3B size (~2GB)
     'Hermes-3-Llama-3.2-3B-q4f16_1-MLC',  // Fine-tuned for tool use (~2GB)
   ],
@@ -90,22 +90,21 @@ export interface CustomModelConfig {
   tokenizerFiles?: string[];
 }
 
-// Registry for custom models (populate after compiling with scripts/compile-cesium-slm.sh)
+// Registry for custom models (populate after compiling with scripts/compile.sh)
 export const CUSTOM_MODEL_REGISTRY: Record<string, CustomModelConfig> = {
-  // OrbPro OrbPro2 MCP 1.5B - Fine-tuned on 88K+ Cesium command examples
-  'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC': {
-    modelId: 'OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC',
-    modelLibUrl: '/models/OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC/resolve/main/OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC.wasm',
-    modelWeightsUrl: '/models/OrbPro-Cesium-SLM-1.5B-q4f16_1-MLC/',
+  // OrbPro2 MCP 1.5B - Fine-tuned on 88K+ CesiumJS command examples
+  'OrbPro2-MCP-1.5B-q4f32_1-MLC': {
+    modelId: 'OrbPro2-MCP-1.5B-q4f32_1-MLC',
+    modelLibUrl: '/models/OrbPro2-MCP-1.5B-q4f32_1-MLC/resolve/main/OrbPro2-MCP-1.5B-q4f32_1-MLC.wasm',
+    modelWeightsUrl: '/models/OrbPro2-MCP-1.5B-q4f32_1-MLC/',
     vramRequired: 1024,
     contextWindowSize: 4096,
   },
-  // OrbPro Cesium SLM 0.5B - Fine-tuned on 100K CSV Cesium command examples
-  // Uses q8f16_1 (8-bit) because q4 is too aggressive for 0.5B structured output
-  'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC': {
-    modelId: 'OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC',
-    modelLibUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC/resolve/main/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC.wasm',
-    modelWeightsUrl: '/models/OrbPro-Cesium-SLM-0.5B-q4f32_1-MLC/',
+  // OrbPro2 MCP 0.5B - Fine-tuned on 88K+ CesiumJS command examples
+  'OrbPro2-MCP-0.5B-q4f32_1-MLC': {
+    modelId: 'OrbPro2-MCP-0.5B-q4f32_1-MLC',
+    modelLibUrl: '/models/OrbPro2-MCP-0.5B-q4f32_1-MLC/resolve/main/OrbPro2-MCP-0.5B-q4f32_1-MLC.wasm',
+    modelWeightsUrl: '/models/OrbPro2-MCP-0.5B-q4f32_1-MLC/',
     vramRequired: 600,
     contextWindowSize: 4096,
   },
@@ -131,11 +130,11 @@ export class WebLLMEngine {
 
   constructor(config: LLMConfig) {
     this.config = {
-      temperature: 0.7,
+      temperature: 0.1,
       topP: 0.9,
       maxTokens: 256,
-      frequencyPenalty: 0.5,
-      presencePenalty: 0.5,
+      frequencyPenalty: 0.0,
+      presencePenalty: 0.0,
       contextWindowSize: 16384,
       ...config,
     };
