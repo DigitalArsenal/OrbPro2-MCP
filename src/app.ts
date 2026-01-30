@@ -13,6 +13,14 @@ import { StatusDisplay } from './ui/status-display';
 import { ModelSelector, ModelSelection } from './ui/model-selector';
 import { initSettingsPanel, getApiKey } from './ui/settings-panel';
 import type { CesiumCommand } from './cesium/types';
+import { decomposeCommand } from './llm/command-decomposer';
+import { parseToolCallFromResponse } from './llm/tool-parser';
+import {
+  correctFlyToCoordinates,
+  correctPolylineCoordinates,
+  SINGLE_POINT_TOOLS,
+  MULTI_POINT_TOOLS,
+} from './llm/geocoder';
 
 // Union type for LLM engines
 type LLMEngine = WebLLMEngine | APILLMEngine;
@@ -459,41 +467,100 @@ export class CesiumSLMApp {
     }
 
     try {
-      // Let the LLM handle all commands via MCP tool calls
-      // The MCP server has the location database and handles coordinate resolution
-
       // Allow browser to repaint and show thinking indicator before LLM inference
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-      const response = await this.llmEngine.generate(message);
+      // Decompose command to check if it needs multi-step orchestration
+      const commands = decomposeCommand(message);
+      const isMultiStep = commands.length > 1;
 
-      // Check for tool calls from LLM
-      if (response.toolCalls && response.toolCalls.length > 0) {
-        // Execute tool calls through MCP server (handles location-aware tools)
-        const toolResults: Array<{ name: string; success: boolean; message: string }> = [];
-        for (const toolCall of response.toolCalls) {
-          if (this.mcpServer) {
-            // Inject API keys for routing tools that need them
-            const args = this.injectApiKeys(toolCall.name, toolCall.arguments);
-            const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
-            toolResults.push({ name: toolCall.name, ...result });
-            console.log(`Tool ${toolCall.name} result:`, result);
+      if (isMultiStep) {
+        // Multi-step orchestrated mode
+        this.chatInterface.addMessage({
+          role: 'system',
+          content: `Decomposed into ${commands.length} steps: ${commands.map((c, i) => `\n${i + 1}. ${c.rawText}`).join('')}`,
+          timestamp: new Date(),
+        });
+
+        const allToolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
+        let lastLocation: string | null = null;
+        let lastCoords: { longitude: number; latitude: number } | null = null;
+
+        for (let i = 0; i < commands.length; i++) {
+          const cmd = commands[i]!;
+          let atomicPrompt = cmd.rawText;
+
+          // Resolve references like "there", "it" using context from previous steps
+          if (lastLocation && /\b(there|here|it|that location)\b/i.test(atomicPrompt)) {
+            atomicPrompt = atomicPrompt.replace(/\b(there|here|it|that location)\b/gi, lastLocation);
+          }
+
+          try {
+            const response = await this.llmEngine!.generate(atomicPrompt);
+            const toolCall = this.extractToolCall(response);
+
+            if (toolCall && this.mcpServer) {
+              let args = await this.geocodeToolArgs(atomicPrompt, toolCall.name, toolCall.arguments);
+
+              // If geocoding didn't resolve and we have coords from a previous step, inject them
+              if (lastCoords && SINGLE_POINT_TOOLS.includes(toolCall.name)) {
+                if (args.longitude === undefined || args.latitude === undefined ||
+                    args.longitude === toolCall.arguments.longitude) {
+                  args = { ...args, longitude: lastCoords.longitude, latitude: lastCoords.latitude };
+                }
+              }
+
+              args = this.injectApiKeys(toolCall.name, args) as Record<string, unknown>;
+              const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
+              allToolCalls.push({ name: toolCall.name, arguments: args });
+              console.log(`Step ${i + 1} - Tool ${toolCall.name} result:`, result);
+
+              // Track location context for subsequent steps
+              if (typeof args.longitude === 'number' && typeof args.latitude === 'number') {
+                lastCoords = { longitude: args.longitude, latitude: args.latitude };
+              }
+            }
+
+            // Extract location name from this step for reference resolution
+            const locEntity = cmd.entities.locations[0];
+            if (locEntity) {
+              lastLocation = locEntity.text;
+            }
+          } catch (stepError) {
+            console.warn(`Step ${i + 1} failed:`, stepError);
           }
         }
 
         this.chatInterface.addMessage({
           role: 'assistant',
-          content: response.content,
+          content: `Executed ${allToolCalls.length}/${commands.length} steps.`,
           timestamp: new Date(),
-          toolCalls: response.toolCalls.map(tc => ({ name: tc.name, arguments: tc.arguments })),
+          toolCalls: allToolCalls,
         });
       } else {
-        // Just a text response from LLM
-        this.chatInterface.addMessage({
-          role: 'assistant',
-          content: response.content,
-          timestamp: new Date(),
-        });
+        // Simple single-command mode
+        const response = await this.llmEngine.generate(message);
+        const toolCall = this.extractToolCall(response);
+
+        if (toolCall && this.mcpServer) {
+          let args = await this.geocodeToolArgs(message, toolCall.name, toolCall.arguments);
+          args = this.injectApiKeys(toolCall.name, args) as Record<string, unknown>;
+          const result = await this.mcpServer.executeToolDirect(toolCall.name, args);
+          console.log(`Tool ${toolCall.name} result:`, result);
+
+          this.chatInterface.addMessage({
+            role: 'assistant',
+            content: response.content,
+            timestamp: new Date(),
+            toolCalls: [{ name: toolCall.name, arguments: args }],
+          });
+        } else {
+          this.chatInterface.addMessage({
+            role: 'assistant',
+            content: response.content,
+            timestamp: new Date(),
+          });
+        }
       }
 
       // Keep conversation history manageable
@@ -510,6 +577,37 @@ export class CesiumSLMApp {
         isError: true,
       });
     }
+  }
+
+  /**
+   * Extract a tool call from an LLM response (structured or text-parsed)
+   */
+  private extractToolCall(response: { content: string; toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }> }): { name: string; arguments: Record<string, unknown> } | null {
+    if (response.toolCalls && response.toolCalls.length > 0) {
+      return response.toolCalls[0] ?? null;
+    }
+    const parsed = parseToolCallFromResponse(response.content);
+    if (parsed) {
+      return { name: parsed.tool, arguments: parsed.arguments };
+    }
+    return null;
+  }
+
+  /**
+   * Apply geocoding corrections based on tool type
+   */
+  private async geocodeToolArgs(
+    userInput: string,
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    if (SINGLE_POINT_TOOLS.includes(toolName)) {
+      return correctFlyToCoordinates(userInput, args);
+    }
+    if (MULTI_POINT_TOOLS.includes(toolName)) {
+      return correctPolylineCoordinates(userInput, args);
+    }
+    return args;
   }
 
   /**
